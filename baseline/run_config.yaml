@@ -1,0 +1,21 @@
+data: path/MOT17/train
+sequences:
+  - MOT17-02-FRCNN
+  - MOT17-04-FRCNN
+outdir: baseline_runs/mot17_botsort
+device: "0"
+
+# Detector
+model: None
+conf: 0.25
+iou: 0.7
+imgsz: 1280
+classes: [0]
+
+# Tracker
+tracker_config: path/botsort_baseline.yaml
+
+visualization:
+  enabled: true
+  fps: 30
+  # max_frames: 300
