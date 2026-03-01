@@ -4,9 +4,9 @@ import time
 from pathlib import Path
 from typing import Any
 
-from .config import BaselineConfig
-from .logging_io import write_mot_rows
-from .timing import summarize_timing
+from utils.config import BaselineConfig
+from utils.io import write_mot_rows
+from utils.timing import summarize_timing
 
 
 def resolve_sequence_dir(data_root: Path, sequence: str) -> Path:

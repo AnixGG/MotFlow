@@ -1,0 +1,7 @@
+numpy
+pandas
+PyYAML
+motmetrics
+opencv-python
+torch
+ultralytics

@@ -1,0 +1,9 @@
+*__pycache__
+tmp/*
+*.txt
+*.mp4
+*.csv
+*.jpg
+__pycache__
+dataset/*
+!requirements.txt

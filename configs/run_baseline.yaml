@@ -1,4 +1,4 @@
-data: path/MOT17/train
+data: /path/to/MOT17/train
 sequences:
   - MOT17-02-FRCNN
   - MOT17-04-FRCNN
@@ -6,16 +6,16 @@ outdir: baseline_runs/mot17_botsort
 device: "0"
 
 # Detector
-model: None
+model: /Users/gazizullinniyaz/VSCode/MOT/tmp/yolo11n.pt
 conf: 0.25
 iou: 0.7
 imgsz: 1280
 classes: [0]
 
 # Tracker
-tracker_config: path/botsort_baseline.yaml
+tracker_config: /Users/gazizullinniyaz/VSCode/MOT/configs/botsort_baseline.yaml
 
 visualization:
-  enabled: true
+  enabled: false
   fps: 30
   # max_frames: 300

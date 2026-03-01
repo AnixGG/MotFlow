@@ -1,17 +1,23 @@
 from __future__ import annotations
 
 import logging
+import sys
 from pathlib import Path
 from typing import Any
 
-from core.cli import build_baseline_config, parse_args, parse_run_settings
-from core.config import LOCAL_ULTRALYTICS_ROOT, REPO_ROOT, ensure_local_ultralytics_path
-from core.env_info import write_env_info
-from core.logging_io import dump_run_config, read_yaml, write_metrics_csv, write_timing_csv
-from core.metrics import evaluate_sequence, summarize_metrics
-from core.timing import attach_raw_timing, build_overall_timing_row
-from core.tracking import resolve_sequence_dir, run_sequence
-from core.visualization import render_sequence_video
+ROOT = Path(__file__).resolve().parents[1]
+SRC = ROOT / "src"
+if str(SRC) not in sys.path:
+    sys.path.insert(0, str(SRC))
+
+from evaluation.metrics import evaluate_sequence, summarize_metrics
+from evaluation.visualization import render_sequence_video
+from tracking.tracking import resolve_sequence_dir, run_sequence
+from utils.cli import build_baseline_config, parse_args, parse_run_settings
+from utils.config import LOCAL_ULTRALYTICS_ROOT, REPO_ROOT, ensure_local_ultralytics_path
+from utils.env_info import write_env_info
+from utils.io import dump_run_config, read_yaml, write_metrics_csv, write_timing_csv
+from utils.timing import attach_raw_timing, build_overall_timing_row
 
 
 def setup_logger(outdir: Path) -> logging.Logger:

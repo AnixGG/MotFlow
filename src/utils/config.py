@@ -36,4 +36,4 @@ def default_model_path() -> Path | str:
 
 
 def default_tracker_path() -> Path:
-    return (Path(__file__).resolve().parents[1] / "botsort_baseline.yaml").resolve()
+    return (REPO_ROOT / "configs" / "botsort_baseline.yaml").resolve()
