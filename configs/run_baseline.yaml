@@ -1,28 +1,21 @@
-data: /Users/gazizullinniyaz/Downloads/sportsmot_publish/dataset/train
-# data: /Users/gazizullinniyaz/VSCode/MOT/dataset/MOT17/train
+data: ../sportsmot_publish/dataset/train
+
 sequences:
-  # - MOT17-02-FRCNN
-  # - MOT17-04-FRCNN
-  # - MOT17-09-FRCNN
-  # - MOT17-10-FRCNN
-  # - MOT17-11-FRCNN
-  # - MOT17-13-FRCNN
   - v_-6Os86HzwCs_c001
   - v_1LwtoLPw2TU_c016
   - v_HdiyOtliFiw_c003
   
-# outdir: experiments/baseline_runs/mot17_botsort_v1
 outdir: experiments/baseline_runs/sportsmot_baseline
 device: "cpu"
 
 # Detector
-model: /Users/gazizullinniyaz/VSCode/MOT/models/detector/yolo11n.pt
+model: ../models/detector/yolo11n.pt
 conf: 0.25
 iou: 0.7
 imgsz: 1280
 classes: [0]
 
-tracker_config: /Users/gazizullinniyaz/VSCode/MOT/configs/botsort_baseline.yaml
+tracker_config: ../configs/botsort_baseline.yaml
 
 visualization:
   enabled: true
