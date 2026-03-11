@@ -1,6 +1,4 @@
 from __future__ import annotations
-
-import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -20,16 +18,17 @@ class BaselineConfig:
     device: str
     resize: str
 
-
-def ensure_local_ultralytics_path() -> None:
-    if LOCAL_ULTRALYTICS_ROOT.exists():
-        local_path = str(LOCAL_ULTRALYTICS_ROOT)
-        if local_path not in sys.path:
-            sys.path.insert(0, local_path)
-
+@dataclass
+class RaftGMCConfig:
+    model_name: str = "small"
+    device: str | None = None
+    mixed_precision: bool = False
+    scale: float = 1.0
+    sample_step: int = 8
+    ransac_reproj_threshold: float = 3.0
 
 def default_model_path() -> Path | str:
-    local_weight = REPO_ROOT / "tmp" / "yolo11n.pt"
+    local_weight = REPO_ROOT / "models" / "detector" / "yolo11n.pt"
     if local_weight.exists():
         return local_weight.resolve()
     return "yolo11n.pt"

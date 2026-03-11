@@ -6,20 +6,31 @@ from typing import Any
 
 def percentile(values: list[float], q: float) -> float:
     if not values:
-        return 0.0
+        return 0
+    
     if len(values) == 1:
         return float(values[0])
-    values_sorted = sorted(values)
-    position = (len(values_sorted) - 1) * q
+    
+    sorted_values = sorted(values)
+
+    position = (len(sorted_values) - 1) * q
+
     lower = int(position)
-    upper = min(lower + 1, len(values_sorted) - 1)
+    upper = min(lower + 1, len(sorted_values) - 1)
     weight = position - lower
-    return float(values_sorted[lower] * (1.0 - weight) + values_sorted[upper] * weight)
+
+    return float(sorted_values[lower] * (1.0 - weight) + sorted_values[upper] * weight)
 
 
 def summarize_timing(sequence: str, latencies_ms: list[float], model_ms: list[float]) -> dict[str, float | int | str]:
-    mean_wall = statistics.fmean(latencies_ms) if latencies_ms else 0.0
-    mean_model = statistics.fmean(model_ms) if model_ms else 0.0
+    mean_wall = 0
+    mean_model = 0
+
+    if latencies_ms:
+        mean_wall = statistics.fmean(latencies_ms)
+    if model_ms:
+        mean_model = statistics.fmean(model_ms)
+
     return {
         "sequence": sequence,
         "frames": len(latencies_ms),
@@ -36,7 +47,10 @@ def summarize_timing(sequence: str, latencies_ms: list[float], model_ms: list[fl
 def build_overall_timing_row(
     all_wall_latencies: list[float], all_model_latencies: list[float], all_frames: int
 ) -> dict[str, float | int | str]:
-    overall_wall_mean = statistics.fmean(all_wall_latencies) if all_wall_latencies else 0.0
+    overall_wall_mean = 0
+    if all_wall_latencies:
+        overall_wall_mean = statistics.fmean(all_wall_latencies)
+        
     return {
         "sequence": "OVERALL",
         "frames": all_frames,

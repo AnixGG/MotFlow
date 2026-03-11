@@ -5,6 +5,8 @@ import platform
 import subprocess
 from pathlib import Path
 
+from tracking.ultralytics_runtime import get_ultralytics_version
+
 
 def git_output(*args: str, cwd: Path) -> str:
     try:
@@ -15,7 +17,6 @@ def git_output(*args: str, cwd: Path) -> str:
 
 def write_env_info(path: Path, repo_root: Path, ultralytics_root: Path) -> None:
     import torch
-    import ultralytics
 
     gpu_name = "cpu"
     if torch.cuda.is_available():
@@ -31,7 +32,7 @@ def write_env_info(path: Path, repo_root: Path, ultralytics_root: Path) -> None:
         f"torch_cuda: {torch.version.cuda or 'none'}",
         f"cuda_available: {torch.cuda.is_available()}",
         f"gpu: {gpu_name}",
-        f"ultralytics: {getattr(ultralytics, '__version__', 'unknown')}",
+        f"ultralytics: {get_ultralytics_version()}",
         f"hostname: {platform.node()}",
         f"pid: {os.getpid()}",
     ]
