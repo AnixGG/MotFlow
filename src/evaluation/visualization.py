@@ -67,6 +67,35 @@ def render_sequence_video(
             frame = cv2.imread(str(frame_path))
             if frame is None:
                 continue
+
+
+            frame_label = f"Frame {idx}/{len(frame_paths)}"
+            (text_w, text_h), baseline = cv2.getTextSize(
+                frame_label,
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.8,
+                2,
+            )
+            text_x, text_y = 12, 28
+            pad = 6
+            cv2.rectangle(
+                frame,
+                (text_x - pad, text_y - text_h - pad),
+                (text_x + text_w + pad, text_y + baseline + pad),
+                (0, 0, 0),
+                -1,
+            )
+            cv2.putText(
+                frame,
+                frame_label,
+                (text_x, text_y),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.8,
+                (255, 255, 255),
+                2,
+                cv2.LINE_AA,
+            )
+
             for track_id, x, y, w, h in tracks.get(idx, []):
                 x1 = int(round(x))
                 y1 = int(round(y))
