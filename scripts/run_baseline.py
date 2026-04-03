@@ -9,7 +9,7 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from pipeline import run_baseline
+from pipeline import run_pipeline
 
 
 def parse_args() -> argparse.Namespace:
@@ -25,7 +25,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    run_baseline(args.config)
+    run_pipeline(args.config)
 
 
 if __name__ == "__main__":

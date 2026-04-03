@@ -3,9 +3,10 @@ from __future__ import annotations
 import sys
 
 from contextlib import contextmanager
-from typing import Any
+from typing import Iterator, Any
 
-from utils.config import LOCAL_ULTRALYTICS_ROOT
+from gmc.raft_gmc import RaftGMC
+from utils.config import RaftGMCConfig, LOCAL_ULTRALYTICS_ROOT
 
 
 def ensure_local_ultralytics() -> None:
@@ -28,3 +29,25 @@ def load_yolo_model(model_path: str) -> Any:
     from ultralytics import YOLO
 
     return YOLO(model_path)
+
+@contextmanager
+def patch_botsort_gmc(raft_config: RaftGMCConfig) -> Iterator[None]:
+    ensure_local_ultralytics()
+    import ultralytics.trackers.bot_sort as bot_sort_module
+    from ultralytics.trackers.utils.gmc import GMC as DefaultGMC
+
+    original_gmc = bot_sort_module.GMC
+
+    def get_gmc(method: str = "sparseOptFlow", downscale: int = 2):
+        if str(method).lower() == "raft":
+            divisor = max(1, int(downscale))
+            scale_gmc = 1 / float(divisor)
+            return RaftGMC(method=method, scale_gmc=scale_gmc, config=raft_config)
+        return DefaultGMC(method=method, downscale=downscale)
+
+    bot_sort_module.GMC = get_gmc
+    try:
+        yield
+    finally:
+        bot_sort_module.GMC = original_gmc
+
