@@ -49,11 +49,13 @@ def run_pipeline(config_path: Path, experimental_mode=False) -> None:
     track_dir = outdir / "tracks"
     track_dir.mkdir(parents=True, exist_ok=True)
 
+    gmc_context = nullcontext()
+
     if experimental_mode:
         gmc_method = str(run_cfg.get("gmc", "none")).strip().lower()
     
         if gmc_method == "raft":
-            gmc_context = nullcontext()
+            
             raft_section = run_cfg.get("raft_gmc", {})
             raft_cfg = build_raft_gmc_config(raft_section if isinstance(raft_section, dict) else {})
             logger.info(
