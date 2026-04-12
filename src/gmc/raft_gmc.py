@@ -36,8 +36,14 @@ class RaftGMC:
         for det in det_array:
             x1, y1, x2, y2 = det[:4]
 
-            if x2 > x1 and y2 > y1:
-                mask[y1:y2, x1:x2] = False
+            x1_clip = np.clip(int(np.floor(x1)), 0, w)
+            y1_clip = np.clip(int(np.floor(y1)), 0, h)
+
+            x2_clip = np.clip(int(np.ceil(x2)), 0, h)
+            y2_clip = np.clip(int(np.ceil(y2)), 0, h)
+
+            if x2_clip > x1_clip and y2_clip > y1_clip:
+                mask[y1_clip:y2_clip, x1_clip:x2_clip] = False
 
         return mask
 
@@ -49,6 +55,23 @@ class RaftGMC:
 
         frame = raw_frame
         detections_scaled = detections
+
+        if self.scale_gmc != 1:
+            h0, w0 = frame.shape[:2]
+
+            new_w = max(1, int(round(w0 * self.scale_gmc)))
+            new_h = max(1, int(round(h0 * self.scale_gmc)))
+
+            frame = cv2.resize(frame, (new_w, new_h), interpolation=cv2.INTER_LINEAR)
+
+            if detections is not None:
+                det_array = np.asarray(detections, dtype=np.float32)
+                if det_array.ndim == 1:
+                    det_array = det_array.reshape(1, -1)
+                    
+                det_array = det_array.copy()
+                det_array[:, :4] *= self.scale_gmc
+                detections_scaled = det_array
 
         if not self.initializedFirstFrame:
             self.prev_frame = frame.copy()
@@ -76,6 +99,10 @@ class RaftGMC:
         if p0.shape[0] > 0:
             shift = np.median(flow_samples, axis=0)
             warp[:, 2] = shift.astype(np.float32)
+
+        if self.scale_gmc != 1:
+            warp[0, 2] /= self.scale_gmc
+            warp[1, 2] /= self.scale_gmc
 
         self.prev_frame = frame.copy()
         return warp

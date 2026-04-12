@@ -59,8 +59,9 @@ def run_pipeline(config_path: Path, experimental_mode=False) -> None:
             raft_section = run_cfg.get("raft_gmc", {})
             raft_cfg = build_raft_gmc_config(raft_section if isinstance(raft_section, dict) else {})
             logger.info(
-                "[experiment] gmc=raft model=%s scale=%s sample_step=%s",
+                "[experiment] gmc=raft model=%s scale_gmc=%s scale=%s sample_step=%s",
                 raft_cfg.model_name,
+                raft_cfg.scale_gmc,
                 raft_cfg.scale,
                 raft_cfg.sample_step,
             )

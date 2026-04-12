@@ -38,16 +38,13 @@ def patch_botsort_gmc(raft_config: RaftGMCConfig) -> Iterator[None]:
 
     original_gmc = bot_sort_module.GMC
 
-    def get_gmc(method: str = "sparseOptFlow", downscale: int = 2):
+    def get_gmc(method: str = "sparseOptFlow", downscale: int = 1):
         if str(method).lower() == "raft":
-            divisor = max(1, int(downscale))
-            scale_gmc = 1 / float(divisor)
-            return RaftGMC(method=method, scale_gmc=scale_gmc, config=raft_config)
+            return RaftGMC(method=method, scale_gmc=raft_config.scale_gmc, config=raft_config)
         return DefaultGMC(method=method, downscale=downscale)
-
+    
     bot_sort_module.GMC = get_gmc
     try:
         yield
     finally:
         bot_sort_module.GMC = original_gmc
-

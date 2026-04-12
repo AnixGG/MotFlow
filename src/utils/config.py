@@ -23,9 +23,10 @@ class RaftGMCConfig:
     model_name: str = "small"
     device: str | None = None
     mixed_precision: bool = False
-    scale: float = 1.0
+    scale_gmc: float = 1
+    scale: float = 1
     sample_step: int = 8
-    ransac_reproj_threshold: float = 3.0
+    ransac_reproj_threshold: float = 3
 
 def default_model_path() -> Path | str:
     local_weight = REPO_ROOT / "models" / "detector" / "yolo11n.pt"
