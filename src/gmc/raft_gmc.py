@@ -17,7 +17,6 @@ class RaftGMC:
             name=self.config.model_name,
             device=self.config.device,
             mixed_precision=self.config.mixed_precision,
-            scale=self.config.scale,
         )
         self.prev_frame: np.ndarray | None = None
         self.initializedFirstFrame = False

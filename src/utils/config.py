@@ -24,7 +24,6 @@ class RaftGMCConfig:
     device: str | None = None
     mixed_precision: bool = False
     scale_gmc: float = 1
-    scale: float = 1
     sample_step: int = 8
     ransac_reproj_threshold: float = 3
 

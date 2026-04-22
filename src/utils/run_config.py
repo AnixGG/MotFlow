@@ -86,7 +86,6 @@ def build_raft_gmc_config(section: dict[str, Any]) -> RaftGMCConfig:
         device=device,
         mixed_precision=bool(section.get("mixed_precision", False)),
         scale_gmc=float(section.get("scale_gmc", 1)),
-        scale=float(section.get("scale", 1)),
         sample_step=int(section.get("sample_step", 8)),
         ransac_reproj_threshold=float(section.get("ransac_reproj_threshold", 3)),
     )

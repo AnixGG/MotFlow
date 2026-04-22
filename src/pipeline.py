@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from evaluation.metrics import compute_hota_scores, evaluate_sequence, summarize_metrics
-from evaluation.visualization import render_sequence_video
+from evaluation.visualization import render_gmc_flow_video, render_sequence_video
 from tracking.botsort_runner import run_botsort_sequence_baseline
 from tracking.ultralytics_runtime import patch_botsort_gmc, load_yolo_model
 from utils.logging import setup_logger
@@ -32,7 +32,7 @@ def run_pipeline(config_path: Path, experimental_mode=False) -> None:
 
     tracker_params = read_yaml(Path(config.tracker))
     dump_run_config(outdir / "config.yaml", config, sequences, tracker_params, data_root)
-    write_env_info(outdir / "env_info.txt", REPO_ROOT, LOCAL_ULTRALYTICS_ROOT)
+    write_env_info(outdir / "env_info.txt", REPO_ROOT, LOCAL_ULTRALYTICS_ROOT, requested_device=config.device)
     vis_cfg = run_cfg.get("visualization", {}) if isinstance(run_cfg.get("visualization", {}), dict) else {}
     vis_enabled = bool(vis_cfg.get("enabled", False))
     vis_fps = float(vis_cfg.get("fps", 30.0))
@@ -44,12 +44,13 @@ def run_pipeline(config_path: Path, experimental_mode=False) -> None:
     logger.info(f"[{current_mode}] outdir=%s", outdir)
     logger.info(f"[{current_mode}] device=%s", config.device)
     logger.info(f"[{current_mode}] visualization=%s", "enabled" if vis_enabled else "disabled")
-
+    
     model = load_yolo_model(config.model)
     track_dir = outdir / "tracks"
     track_dir.mkdir(parents=True, exist_ok=True)
 
     gmc_context = nullcontext()
+    raft_cfg = None
 
     if experimental_mode:
         gmc_method = str(run_cfg.get("gmc", "none")).strip().lower()
@@ -59,10 +60,9 @@ def run_pipeline(config_path: Path, experimental_mode=False) -> None:
             raft_section = run_cfg.get("raft_gmc", {})
             raft_cfg = build_raft_gmc_config(raft_section if isinstance(raft_section, dict) else {})
             logger.info(
-                "[experiment] gmc=raft model=%s scale_gmc=%s scale=%s sample_step=%s",
+                "[experiment] gmc=raft model=%s scale_gmc=%s sample_step=%s",
                 raft_cfg.model_name,
                 raft_cfg.scale_gmc,
-                raft_cfg.scale,
                 raft_cfg.sample_step,
             )
             gmc_context = patch_botsort_gmc(raft_cfg)
