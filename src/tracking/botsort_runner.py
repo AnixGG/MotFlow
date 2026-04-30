@@ -9,6 +9,21 @@ from utils.io import write_mot_rows
 from utils.timing import summarize_timing
 
 
+def _read_raft_gmc_timing_ms(model: Any) -> float | None:
+    predictor = getattr(model, "predictor", None)
+    trackers = getattr(predictor, "trackers", None)
+    if not trackers:
+        return None
+
+    gmc = getattr(trackers[0], "gmc", None)
+    value = getattr(gmc, "last_timing_ms", None)
+    if value is None:
+        return None
+
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def run_botsort_sequence_baseline(model: Any, seq_dir: Path, output_path: Path, config: BaselineConfig) -> dict[str, Any]:
@@ -28,7 +43,12 @@ def run_botsort_sequence_baseline(model: Any, seq_dir: Path, output_path: Path, 
 
     mot_rows: list[list[float]] = []
     wall_latencies_ms: list[float] = []
+    preprocess_latencies_ms: list[float] = []
+    inference_latencies_ms: list[float] = []
+    postprocess_latencies_ms: list[float] = []
     model_latencies_ms: list[float] = []
+    residual_latencies_ms: list[float] = []
+    raft_gmc_latencies_ms: list[float] = []
 
     frame_idx = 0
     stream_iter = iter(result_stream)
@@ -62,16 +82,46 @@ def run_botsort_sequence_baseline(model: Any, seq_dir: Path, output_path: Path, 
                     ]
                 )
 
-        model_ms = 0
+        preprocess_ms = 0
+        inference_ms = 0
+        postprocess_ms = 0
         if getattr(result, "speed", None):
-            model_ms = float(sum(result.speed.values()))
+            preprocess_ms = float(result.speed.get("preprocess", 0.0))
+            inference_ms = float(result.speed.get("inference", 0.0))
+            postprocess_ms = float(result.speed.get("postprocess", 0.0))
+
+        model_ms = preprocess_ms + inference_ms + postprocess_ms
+        wall_ms = (time.perf_counter() - frame_start) * 1000.0
+        residual_ms = max(0.0, wall_ms - model_ms)
+        raft_gmc_ms = _read_raft_gmc_timing_ms(model)
+
+        wall_latencies_ms.append(wall_ms)
+        preprocess_latencies_ms.append(preprocess_ms)
+        inference_latencies_ms.append(inference_ms)
+        postprocess_latencies_ms.append(postprocess_ms)
         model_latencies_ms.append(model_ms)
-        wall_latencies_ms.append((time.perf_counter() - frame_start) * 1000)
+        residual_latencies_ms.append(residual_ms)
+        if raft_gmc_ms is not None:
+            raft_gmc_latencies_ms.append(raft_gmc_ms)
 
     write_mot_rows(output_path, mot_rows)
     return {
         "rows": len(mot_rows),
         "wall_latencies_ms": wall_latencies_ms,
+        "preprocess_latencies_ms": preprocess_latencies_ms,
+        "inference_latencies_ms": inference_latencies_ms,
+        "postprocess_latencies_ms": postprocess_latencies_ms,
         "model_latencies_ms": model_latencies_ms,
-        "timing": summarize_timing(seq_dir.name, wall_latencies_ms, model_latencies_ms),
+        "residual_latencies_ms": residual_latencies_ms,
+        "raft_gmc_latencies_ms": raft_gmc_latencies_ms,
+        "timing": summarize_timing(
+            seq_dir.name,
+            wall_latencies_ms,
+            preprocess_latencies_ms,
+            inference_latencies_ms,
+            postprocess_latencies_ms,
+            model_latencies_ms,
+            residual_latencies_ms,
+            raft_gmc_latencies_ms,
+        ),
     }

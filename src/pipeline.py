@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from evaluation.metrics import compute_hota_scores, evaluate_sequence, summarize_metrics
-from evaluation.visualization import render_gmc_flow_video, render_sequence_video
+from evaluation.visualization import render_sequence_video
 from tracking.botsort_runner import run_botsort_sequence_baseline
 from tracking.ultralytics_runtime import patch_botsort_gmc, load_yolo_model
 from utils.logging import setup_logger
@@ -32,7 +32,7 @@ def run_pipeline(config_path: Path, experimental_mode=False) -> None:
 
     tracker_params = read_yaml(Path(config.tracker))
     dump_run_config(outdir / "config.yaml", config, sequences, tracker_params, data_root)
-    write_env_info(outdir / "env_info.txt", REPO_ROOT, LOCAL_ULTRALYTICS_ROOT, requested_device=config.device)
+    write_env_info(outdir / "env_info.txt", REPO_ROOT, LOCAL_ULTRALYTICS_ROOT)
     vis_cfg = run_cfg.get("visualization", {}) if isinstance(run_cfg.get("visualization", {}), dict) else {}
     vis_enabled = bool(vis_cfg.get("enabled", False))
     vis_fps = float(vis_cfg.get("fps", 30.0))
@@ -44,13 +44,12 @@ def run_pipeline(config_path: Path, experimental_mode=False) -> None:
     logger.info(f"[{current_mode}] outdir=%s", outdir)
     logger.info(f"[{current_mode}] device=%s", config.device)
     logger.info(f"[{current_mode}] visualization=%s", "enabled" if vis_enabled else "disabled")
-    
+
     model = load_yolo_model(config.model)
     track_dir = outdir / "tracks"
     track_dir.mkdir(parents=True, exist_ok=True)
 
     gmc_context = nullcontext()
-    raft_cfg = None
 
     if experimental_mode:
         gmc_method = str(run_cfg.get("gmc", "none")).strip().lower()
@@ -88,7 +87,18 @@ def run_pipeline(config_path: Path, experimental_mode=False) -> None:
             
             accumulators[sequence] = evaluate_sequence(gt_path, pred_path)
             hota_pairs[sequence] = (gt_path, pred_path)
-            timing_rows.append(attach_raw_timing(run_info["timing"], run_info["wall_latencies_ms"], run_info["model_latencies_ms"]))
+            timing_rows.append(
+                attach_raw_timing(
+                    run_info["timing"],
+                    wall_latencies=run_info["wall_latencies_ms"],
+                    preprocess_latencies=run_info["preprocess_latencies_ms"],
+                    inference_latencies=run_info["inference_latencies_ms"],
+                    postprocess_latencies=run_info["postprocess_latencies_ms"],
+                    model_latencies=run_info["model_latencies_ms"],
+                    residual_latencies=run_info["residual_latencies_ms"],
+                    raft_gmc_latencies=run_info["raft_gmc_latencies_ms"],
+                )
+            )
             
             if vis_enabled:
                 vis_path = outdir / "vis" / f"{sequence}.mp4"
@@ -106,10 +116,29 @@ def run_pipeline(config_path: Path, experimental_mode=False) -> None:
     write_metrics_csv(outdir / "metrics.csv", metrics_summary)
 
     all_wall_latencies = [lat for item in timing_rows for lat in item.pop("_wall_latencies_ms", [])]
+    
+    all_preprocess_latencies = [lat for item in timing_rows for lat in item.pop("_preprocess_latencies_ms", [])]
+    all_inference_latencies = [lat for item in timing_rows for lat in item.pop("_inference_latencies_ms", [])]
+    all_postprocess_latencies = [lat for item in timing_rows for lat in item.pop("_postprocess_latencies_ms", [])]
+    
     all_model_latencies = [lat for item in timing_rows for lat in item.pop("_model_latencies_ms", [])]
+    all_residual_latencies = [lat for item in timing_rows for lat in item.pop("_residual_latencies_ms", [])]
+    all_raft_gmc_latencies = [lat for item in timing_rows for lat in item.pop("_raft_gmc_latencies_ms", [])]
+    
     all_frames = sum(int(row["frames"]) for row in timing_rows)
     if all_frames:
-        timing_rows.append(build_overall_timing_row(all_wall_latencies, all_model_latencies, all_frames))
+        timing_rows.append(
+            build_overall_timing_row(
+                all_wall_latencies,
+                all_preprocess_latencies,
+                all_inference_latencies,
+                all_postprocess_latencies,
+                all_model_latencies,
+                all_residual_latencies,
+                all_raft_gmc_latencies,
+                all_frames,
+            )
+        )
     write_timing_csv(outdir / "timing.csv", timing_rows)
 
     logger.info("[done] metrics=%s", outdir / "metrics.csv")

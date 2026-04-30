@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import time
+
 import cv2
 import numpy as np
 
@@ -12,6 +14,8 @@ class RaftGMC:
         self.method = method
         self.scale_gmc = float(scale_gmc)
         self.config = config or RaftGMCConfig()
+        self.last_timing_ms: float | None = None
+        self.last_timing_breakdown_ms: dict[str, float] = {}
 
         self.raft = RAFTWrapper(
             name=self.config.model_name,
@@ -24,6 +28,8 @@ class RaftGMC:
     def reset_params(self) -> None:
         self.prev_frame = None
         self.initializedFirstFrame = False
+        self.last_timing_ms = None
+        self.last_timing_breakdown_ms = {}
 
     def _build_static_mask(self, h: int, w: int, detections: list | np.ndarray | None) -> np.ndarray:
         if detections is None:
@@ -47,13 +53,17 @@ class RaftGMC:
         return mask
 
     def apply(self, raw_frame: np.ndarray, detections: list | np.ndarray | None = None) -> np.ndarray:
+        total_start = time.perf_counter()
         warp = np.eye(2, 3, dtype=np.float32)
         
         if raw_frame is None or raw_frame.size == 0:
+            self.last_timing_ms = 0.0
+            self.last_timing_breakdown_ms = {"total": 0.0}
             return warp
 
         frame = raw_frame
         detections_scaled = detections
+        prepare_start = time.perf_counter()
 
         if self.scale_gmc != 1:
             h0, w0 = frame.shape[:2]
@@ -72,12 +82,27 @@ class RaftGMC:
                 det_array[:, :4] *= self.scale_gmc
                 detections_scaled = det_array
 
+        prepare_ms = (time.perf_counter() - prepare_start) * 1000.0
+
         if not self.initializedFirstFrame:
             self.prev_frame = frame.copy()
             self.initializedFirstFrame = True
+            total_ms = (time.perf_counter() - total_start) * 1000.0
+            self.last_timing_ms = total_ms
+            self.last_timing_breakdown_ms = {
+                "prepare": prepare_ms,
+                "raft_infer": 0.0,
+                "sample_filter": 0.0,
+                "warp_estimation": 0.0,
+                "total": total_ms,
+            }
             return warp
         
+        raft_start = time.perf_counter()
         flow = self.raft(self.prev_frame, frame)  # [H, W, 2]
+        raft_infer_ms = (time.perf_counter() - raft_start) * 1000.0
+
+        sample_start = time.perf_counter()
         h, w = flow.shape[:2]
 
         step = max(2, int(self.config.sample_step))
@@ -94,7 +119,10 @@ class RaftGMC:
 
         p0 = p0[valid]
         flow_samples = flow_samples[valid]
+        
+        sample_filter_ms = (time.perf_counter() - sample_start) * 1000.0
 
+        warp_start = time.perf_counter()
         if p0.shape[0] > 0:
             shift = np.median(flow_samples, axis=0)
             warp[:, 2] = shift.astype(np.float32)
@@ -102,6 +130,17 @@ class RaftGMC:
         if self.scale_gmc != 1:
             warp[0, 2] /= self.scale_gmc
             warp[1, 2] /= self.scale_gmc
+        warp_estimation_ms = (time.perf_counter() - warp_start) * 1000.0
+
+        total_ms = (time.perf_counter() - total_start) * 1000.0
+        self.last_timing_ms = total_ms
+        self.last_timing_breakdown_ms = {
+            "prepare": prepare_ms,
+            "raft_infer": raft_infer_ms,
+            "sample_filter": sample_filter_ms,
+            "warp_estimation": warp_estimation_ms,
+            "total": total_ms,
+        }
 
         self.prev_frame = frame.copy()
         return warp
