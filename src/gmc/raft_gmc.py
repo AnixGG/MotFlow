@@ -14,8 +14,8 @@ class RaftGMC:
         self.method = method
         self.scale_gmc = float(scale_gmc)
         self.config = config or RaftGMCConfig()
-        self.last_timing_ms: float | None = None
-        self.last_timing_breakdown_ms: dict[str, float] = {}
+        self.last_timing_ms = None
+        self.last_timing_breakdown_ms = {}
 
         self.raft = RAFTWrapper(
             name=self.config.model_name,
@@ -57,8 +57,8 @@ class RaftGMC:
         warp = np.eye(2, 3, dtype=np.float32)
         
         if raw_frame is None or raw_frame.size == 0:
-            self.last_timing_ms = 0.0
-            self.last_timing_breakdown_ms = {"total": 0.0}
+            self.last_timing_ms = 0
+            self.last_timing_breakdown_ms = {"total": 0}
             return warp
 
         frame = raw_frame
@@ -82,25 +82,25 @@ class RaftGMC:
                 det_array[:, :4] *= self.scale_gmc
                 detections_scaled = det_array
 
-        prepare_ms = (time.perf_counter() - prepare_start) * 1000.0
+        prepare_ms = (time.perf_counter() - prepare_start) * 1000
 
         if not self.initializedFirstFrame:
             self.prev_frame = frame.copy()
             self.initializedFirstFrame = True
-            total_ms = (time.perf_counter() - total_start) * 1000.0
+            total_ms = (time.perf_counter() - total_start) * 1000
             self.last_timing_ms = total_ms
             self.last_timing_breakdown_ms = {
                 "prepare": prepare_ms,
-                "raft_infer": 0.0,
-                "sample_filter": 0.0,
-                "warp_estimation": 0.0,
+                "raft_infer": 0,
+                "sample_filter": 0,
+                "warp_estimation": 0,
                 "total": total_ms,
             }
             return warp
         
         raft_start = time.perf_counter()
         flow = self.raft(self.prev_frame, frame)  # [H, W, 2]
-        raft_infer_ms = (time.perf_counter() - raft_start) * 1000.0
+        raft_infer_ms = (time.perf_counter() - raft_start) * 1000
 
         sample_start = time.perf_counter()
         h, w = flow.shape[:2]
@@ -119,8 +119,8 @@ class RaftGMC:
 
         p0 = p0[valid]
         flow_samples = flow_samples[valid]
-        
-        sample_filter_ms = (time.perf_counter() - sample_start) * 1000.0
+
+        sample_filter_ms = (time.perf_counter() - sample_start) * 1000
 
         warp_start = time.perf_counter()
         if p0.shape[0] > 0:
@@ -130,9 +130,9 @@ class RaftGMC:
         if self.scale_gmc != 1:
             warp[0, 2] /= self.scale_gmc
             warp[1, 2] /= self.scale_gmc
-        warp_estimation_ms = (time.perf_counter() - warp_start) * 1000.0
+        warp_estimation_ms = (time.perf_counter() - warp_start) * 1000
 
-        total_ms = (time.perf_counter() - total_start) * 1000.0
+        total_ms = (time.perf_counter() - total_start) * 1000
         self.last_timing_ms = total_ms
         self.last_timing_breakdown_ms = {
             "prepare": prepare_ms,

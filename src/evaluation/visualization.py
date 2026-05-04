@@ -34,7 +34,7 @@ def render_sequence_video(
     seq_dir: Path,
     tracks_path: Path,
     out_path: Path,
-    fps: float = 30.0,
+    fps: float = 30,
     max_frames: int | None = None,
 ) -> None:
     img_dir = seq_dir / "img1"

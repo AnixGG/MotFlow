@@ -19,9 +19,9 @@ from utils.timing import attach_raw_timing, build_overall_timing_row
 
 
 def run_pipeline(config_path: Path, experimental_mode=False) -> None:
-    run_cfg = read_yaml(config_path.expanduser().resolve())
-    data_root, outdir, sequences = parse_run_settings(run_cfg)
-    config = build_baseline_config(run_cfg)
+    run_config = read_yaml(config_path.expanduser().resolve())
+    data_root, outdir, sequences = parse_run_settings(run_config)
+    config = build_baseline_config(run_config)
 
     outdir.mkdir(parents=True, exist_ok=True)
     logger = setup_logger(outdir)
@@ -31,12 +31,14 @@ def run_pipeline(config_path: Path, experimental_mode=False) -> None:
         current_mode = "experiment"
 
     tracker_params = read_yaml(Path(config.tracker))
+
     dump_run_config(outdir / "config.yaml", config, sequences, tracker_params, data_root)
     write_env_info(outdir / "env_info.txt", REPO_ROOT, LOCAL_ULTRALYTICS_ROOT)
-    vis_cfg = run_cfg.get("visualization", {}) if isinstance(run_cfg.get("visualization", {}), dict) else {}
-    vis_enabled = bool(vis_cfg.get("enabled", False))
-    vis_fps = float(vis_cfg.get("fps", 30.0))
-    vis_max_frames = vis_cfg.get("max_frames")
+
+    vis_config = run_config.get("visualization", {}) if isinstance(run_config.get("visualization", {}), dict) else {}
+    vis_enabled = bool(vis_config.get("enabled", False))
+    vis_fps = float(vis_config.get("fps", 30.0))
+    vis_max_frames = vis_config.get("max_frames")
     vis_max_frames = int(vis_max_frames) if vis_max_frames is not None else None
 
     logger.info(f"[{current_mode}] data=%s", data_root)
@@ -52,25 +54,25 @@ def run_pipeline(config_path: Path, experimental_mode=False) -> None:
     gmc_context = nullcontext()
 
     if experimental_mode:
-        gmc_method = str(run_cfg.get("gmc", "none")).strip().lower()
+        gmc_method = str(run_config.get("gmc", "none")).strip().lower()
     
         if gmc_method == "raft":
             
-            raft_section = run_cfg.get("raft_gmc", {})
-            raft_cfg = build_raft_gmc_config(raft_section if isinstance(raft_section, dict) else {})
+            raft_section = run_config.get("raft_gmc", {})
+            raft_config = build_raft_gmc_config(raft_section if isinstance(raft_section, dict) else {})
             logger.info(
                 "[experiment] gmc=raft model=%s scale_gmc=%s sample_step=%s",
-                raft_cfg.model_name,
-                raft_cfg.scale_gmc,
-                raft_cfg.sample_step,
+                raft_config.model_name,
+                raft_config.scale_gmc,
+                raft_config.sample_step,
             )
-            gmc_context = patch_botsort_gmc(raft_cfg)
+            gmc_context = patch_botsort_gmc(raft_config)
         else:
             logger.info("[experiment] gmc=%s", gmc_method)
 
-    accumulators: dict[str, Any] = {}
-    hota_pairs: dict[str, tuple[Path, Path]] = {}
-    timing_rows: list[dict[str, Any]] = []
+    accumulators = {}
+    hota_pairs = {}
+    timing_rows = []
 
     with gmc_context:
         for sequence in sequences:

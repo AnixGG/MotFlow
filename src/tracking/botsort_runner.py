@@ -41,14 +41,14 @@ def run_botsort_sequence_baseline(model: Any, seq_dir: Path, output_path: Path, 
         save=False,
     )
 
-    mot_rows: list[list[float]] = []
-    wall_latencies_ms: list[float] = []
-    preprocess_latencies_ms: list[float] = []
-    inference_latencies_ms: list[float] = []
-    postprocess_latencies_ms: list[float] = []
-    model_latencies_ms: list[float] = []
-    residual_latencies_ms: list[float] = []
-    raft_gmc_latencies_ms: list[float] = []
+    mot_rows = []
+    wall_latencies_ms = []
+    preprocess_latencies_ms = []
+    inference_latencies_ms = []
+    postprocess_latencies_ms = []
+    model_latencies_ms = []
+    residual_latencies_ms = []
+    raft_gmc_latencies_ms = []
 
     frame_idx = 0
     stream_iter = iter(result_stream)
@@ -71,8 +71,8 @@ def run_botsort_sequence_baseline(model: Any, seq_dir: Path, output_path: Path, 
                     [
                         frame_idx,
                         int(track_id),
-                        float(x_center - width / 2.0),
-                        float(y_center - height / 2.0),
+                        float(x_center - width / 2),
+                        float(y_center - height / 2),
                         float(width),
                         float(height),
                         float(confs[det_idx]),
@@ -86,12 +86,12 @@ def run_botsort_sequence_baseline(model: Any, seq_dir: Path, output_path: Path, 
         inference_ms = 0
         postprocess_ms = 0
         if getattr(result, "speed", None):
-            preprocess_ms = float(result.speed.get("preprocess", 0.0))
-            inference_ms = float(result.speed.get("inference", 0.0))
-            postprocess_ms = float(result.speed.get("postprocess", 0.0))
+            preprocess_ms = float(result.speed.get("preprocess", 0))
+            inference_ms = float(result.speed.get("inference", 0))
+            postprocess_ms = float(result.speed.get("postprocess", 0))
 
         model_ms = preprocess_ms + inference_ms + postprocess_ms
-        wall_ms = (time.perf_counter() - frame_start) * 1000.0
+        wall_ms = (time.perf_counter() - frame_start) * 1000
         residual_ms = max(0.0, wall_ms - model_ms)
         raft_gmc_ms = _read_raft_gmc_timing_ms(model)
 

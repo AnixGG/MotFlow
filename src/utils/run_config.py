@@ -9,7 +9,7 @@ from .config import BaselineConfig, RaftGMCConfig, default_model_path, default_t
 
 
 def normalize_sequences(raw_values: Iterable[str]) -> list[str]:
-    sequences: list[str] = []
+    sequences = []
     for value in raw_values:
         parts = [item.strip() for item in value.split(",")]
         sequences.extend([item for item in parts if item])

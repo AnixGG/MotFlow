@@ -19,7 +19,7 @@ def write_mot_rows(path: Path, rows: list[list[float]]) -> None:
         writer.writerows(rows)
 
 def write_metrics_csv(path: Path, summary: Any) -> None:
-    rows: list[dict[str, Any]] = []
+    rows= []
     for index_name, row in summary.iterrows():
         rows.append(
             {

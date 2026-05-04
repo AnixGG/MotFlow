@@ -38,7 +38,7 @@ def patch_botsort_gmc(raft_config: RaftGMCConfig) -> Iterator[None]:
 
     original_gmc = bot_sort_module.GMC
 
-    def get_gmc(method: str = "sparseOptFlow", downscale: int = 1):
+    def get_gmc(method: str = "none", downscale: int = 1):
         if str(method).lower() == "raft":
             return RaftGMC(method=method, scale_gmc=raft_config.scale_gmc, config=raft_config)
         return DefaultGMC(method=method, downscale=downscale)
