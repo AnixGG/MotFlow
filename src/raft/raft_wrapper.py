@@ -7,14 +7,13 @@ import torch
 import torch.nn.functional as F
 from torchvision.models.optical_flow import Raft_Large_Weights, Raft_Small_Weights, raft_large, raft_small
 
-
 class RAFTWrapper: # считает dense optical flow между двумя кадрами
     def __init__(
         self,
         name: Literal["small", "large"] = "small",
         device: str | None = None,
         mixed_precision: bool = False,
-        scale: float = 1,
+        num_flow_updates=1,
     ) -> None:
         if name not in {"small", "large"}:
             raise ValueError(f"Unsupported RAFT model size: {name}. Use 'small' or 'large'.")
@@ -22,7 +21,7 @@ class RAFTWrapper: # считает dense optical flow между двумя к�
         self.name = name
         self.device = torch.device(device or ("cuda" if torch.cuda.is_available() else "cpu"))
         self.mixed_precision = bool(mixed_precision and self.device.type == "cuda")
-        self.scale = scale
+        self.num_flow_updates = num_flow_updates
 
         if name == "small":
             weights = Raft_Small_Weights.DEFAULT
@@ -31,6 +30,7 @@ class RAFTWrapper: # считает dense optical flow между двумя к�
             weights = Raft_Large_Weights.DEFAULT
             self.model = raft_large(weights=weights, progress=False)
 
+        self.model.mask_predictor = None
         self.preprocess = weights.transforms()
         self.model = self.model.to(self.device).eval()
 
@@ -49,7 +49,7 @@ class RAFTWrapper: # считает dense optical flow между двумя к�
             raise ValueError(f"Expected frame with shape [H,W,3], got shape={frame.shape}")
 
         # BGR -> RGB
-        rgb = frame[:, :, ::-1]
+        rgb = frame[:, :, ::-1].copy()
         tensor = torch.from_numpy(rgb).permute(2, 0, 1).contiguous().float() / 255
         return tensor
 
@@ -62,41 +62,15 @@ class RAFTWrapper: # считает dense optical flow между двумя к�
 
         image1, image2 = self.preprocess(image1, image2)
 
-        original_size = image1.shape[-2:]
-        if self.scale != 1: # resize
-            image1 = F.interpolate(
-                image1,
-                scale_factor=self.scale,
-                mode="bilinear",
-                align_corners=False
-            )
-            image2 = F.interpolate(
-                image2,
-                scale_factor=self.scale,
-                mode="bilinear",
-                align_corners=False
-            )
-
-
         with torch.inference_mode():
             if self.mixed_precision:
                 with torch.autocast(device_type="cuda", dtype=torch.float16):
-                    flow_predictions = self.model(image1, image2)
+                    flow_predictions = self.model(image1, image2, num_flow_updates=self.num_flow_updates)
             else:
-                flow_predictions = self.model(image1, image2)
+                flow_predictions = self.model(image1, image2, num_flow_updates=self.num_flow_updates)
 
         flow = flow_predictions[-1] # [1,2,h,w]
 
-        if self.scale != 1: # upscale
-            flow = F.interpolate(
-                flow,
-                size=original_size,
-                mode="bilinear",
-                align_corners=False
-            )
-
-            flow = flow / self.scale
-        
         flow = flow[0] # [2,h,w]
         return flow.permute(1, 2, 0).detach().cpu().numpy().astype(np.float32)
 
