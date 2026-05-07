@@ -4,6 +4,34 @@ import statistics
 from typing import Any
 
 
+def cuda_synchronize(device: Any = None) -> None:
+    import torch
+
+    if not torch.cuda.is_available():
+        return
+
+    if device is None:
+        torch.cuda.synchronize()
+        return
+
+    if isinstance(device, torch.device):
+        if device.type == "cuda":
+            torch.cuda.synchronize(device)
+        return
+
+    if isinstance(device, int):
+        torch.cuda.synchronize(device)
+        return
+
+    device_text = str(device).strip().lower()
+    if device_text == "cuda":
+        torch.cuda.synchronize()
+    elif device_text.startswith("cuda:"):
+        torch.cuda.synchronize(torch.device(device_text))
+    elif device_text.isdigit():
+        torch.cuda.synchronize(int(device_text))
+
+
 def percentile(values: list[float], q: float) -> float:
     if not values:
         return 0

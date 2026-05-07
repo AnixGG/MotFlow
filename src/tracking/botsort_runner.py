@@ -6,7 +6,7 @@ from typing import Any
 
 from utils.config import BaselineConfig
 from utils.io import write_mot_rows
-from utils.timing import summarize_timing
+from utils.timing import cuda_synchronize, summarize_timing
 
 
 def _read_raft_gmc_timing_ms(model: Any) -> float | None:
@@ -60,11 +60,13 @@ def run_botsort_sequence_baseline(model: Any, seq_dir: Path, output_path: Path, 
     frame_idx = 0
     stream_iter = iter(result_stream)
     while True:
+        cuda_synchronize(config.device)
         frame_start = time.perf_counter()
         try:
             result = next(stream_iter)
         except StopIteration:
             break
+        cuda_synchronize(config.device)
         frame_idx += 1
 
         boxes = result.boxes

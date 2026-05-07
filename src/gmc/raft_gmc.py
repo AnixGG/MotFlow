@@ -7,6 +7,7 @@ import numpy as np
 
 from raft.raft_wrapper import RAFTWrapper
 from utils.config import RaftGMCConfig
+from utils.timing import cuda_synchronize
 
 
 class RaftGMC:
@@ -56,6 +57,7 @@ class RaftGMC:
         self.last_timing_breakdown_ms = {}
 
     def apply(self, raw_frame: np.ndarray, detections: list | np.ndarray | None = None) -> np.ndarray:
+        cuda_synchronize(getattr(self.raft, "device", None))
         total_start = time.perf_counter()
         warp = np.eye(2, 3, dtype=np.float32)
 
@@ -84,8 +86,10 @@ class RaftGMC:
             }
             return warp
 
+        cuda_synchronize(getattr(self.raft, "device", None))
         raft_start = time.perf_counter()
         flow = self.raft(self.prev_frame, frame)  # low-res [H/8, W/8, 2], values in resized-frame pixels
+        cuda_synchronize(getattr(self.raft, "device", None))
         raft_infer_ms = (time.perf_counter() - raft_start) * 1000
 
         sample_start = time.perf_counter()
