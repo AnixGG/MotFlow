@@ -27,6 +27,13 @@ def _read_raft_gmc_timing_ms(model: Any) -> float | None:
 
 
 def run_botsort_sequence_baseline(model: Any, seq_dir: Path, output_path: Path, config: BaselineConfig) -> dict[str, Any]:
+    # # reset
+    predictor = getattr(model, "predictor", None)
+    if predictor and getattr(predictor, "trackers", None):
+        for tracker in predictor.trackers:
+            tracker.reset()
+        predictor.vid_path = [None] * len(predictor.trackers)
+
     result_stream = model.track(
         source=str(seq_dir / "img1"),
         tracker=config.tracker,

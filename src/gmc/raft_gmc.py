@@ -14,6 +14,7 @@ class RaftGMC:
         self.method = method
         self.scale_gmc = float(scale_gmc)
         self.config = config or RaftGMCConfig()
+        self.image_size = 128
         self.last_timing_ms = None
         self.last_timing_breakdown_ms = {}
 
@@ -25,68 +26,53 @@ class RaftGMC:
         self.prev_frame: np.ndarray | None = None
         self.initializedFirstFrame = False
 
+    def _prepare_frame(self, raw_frame: np.ndarray) -> tuple[np.ndarray, float, float]:
+        frame = raw_frame
+        scale_x = 1.0
+        scale_y = 1.0
+
+        if self.scale_gmc != 1:
+            h0, w0 = frame.shape[:2]
+            new_w = max(1, int(round(w0 * self.scale_gmc)))
+            new_h = max(1, int(round(h0 * self.scale_gmc)))
+            frame = cv2.resize(frame, (new_w, new_h), interpolation=cv2.INTER_LINEAR)
+            scale_x /= self.scale_gmc
+            scale_y /= self.scale_gmc
+
+        h, w = frame.shape[:2]
+        size = max(128, self.image_size)
+        if size % 8:
+            size = ((size + 7) // 8) * 8
+
+        scale_x *= w / size
+        scale_y *= h / size
+        frame = cv2.resize(frame, (size, size), interpolation=cv2.INTER_LINEAR)
+        return frame, scale_x, scale_y
+
     def reset_params(self) -> None:
         self.prev_frame = None
         self.initializedFirstFrame = False
         self.last_timing_ms = None
         self.last_timing_breakdown_ms = {}
 
-    def _build_static_mask(self, h: int, w: int, detections: list | np.ndarray | None) -> np.ndarray:
-        if detections is None:
-            return np.ones((h, w), dtype=bool)
-        
-        det_array = np.asarray(detections)
-        mask = np.ones((h, w), dtype=bool)
-
-        for det in det_array:
-            x1, y1, x2, y2 = det[:4]
-
-            x1_clip = np.clip(int(np.floor(x1)), 0, w)
-            y1_clip = np.clip(int(np.floor(y1)), 0, h)
-
-            x2_clip = np.clip(int(np.ceil(x2)), 0, h)
-            y2_clip = np.clip(int(np.ceil(y2)), 0, h)
-
-            if x2_clip > x1_clip and y2_clip > y1_clip:
-                mask[y1_clip:y2_clip, x1_clip:x2_clip] = False
-
-        return mask
-
     def apply(self, raw_frame: np.ndarray, detections: list | np.ndarray | None = None) -> np.ndarray:
         total_start = time.perf_counter()
         warp = np.eye(2, 3, dtype=np.float32)
-        
+
         if raw_frame is None or raw_frame.size == 0:
             self.last_timing_ms = 0
             self.last_timing_breakdown_ms = {"total": 0}
             return warp
 
-        frame = raw_frame
-        detections_scaled = detections
         prepare_start = time.perf_counter()
 
-        if self.scale_gmc != 1:
-            h0, w0 = frame.shape[:2]
-
-            new_w = max(1, int(round(w0 * self.scale_gmc)))
-            new_h = max(1, int(round(h0 * self.scale_gmc)))
-
-            frame = cv2.resize(frame, (new_w, new_h), interpolation=cv2.INTER_LINEAR)
-
-            if detections is not None:
-                det_array = np.asarray(detections, dtype=np.float32)
-                if det_array.ndim == 1:
-                    det_array = det_array.reshape(1, -1)
-                    
-                det_array = det_array.copy()
-                det_array[:, :4] *= self.scale_gmc
-                detections_scaled = det_array
-
+        frame, scale_x, scale_y = self._prepare_frame(raw_frame)
         prepare_ms = (time.perf_counter() - prepare_start) * 1000
 
         if not self.initializedFirstFrame:
             self.prev_frame = frame.copy()
             self.initializedFirstFrame = True
+
             total_ms = (time.perf_counter() - total_start) * 1000
             self.last_timing_ms = total_ms
             self.last_timing_breakdown_ms = {
@@ -97,39 +83,26 @@ class RaftGMC:
                 "total": total_ms,
             }
             return warp
-        
+
         raft_start = time.perf_counter()
-        flow = self.raft(self.prev_frame, frame)  # [H, W, 2]
+        flow = self.raft(self.prev_frame, frame)  # low-res [H/8, W/8, 2], values in resized-frame pixels
         raft_infer_ms = (time.perf_counter() - raft_start) * 1000
 
         sample_start = time.perf_counter()
-        h, w = flow.shape[:2]
 
-        step = max(2, int(self.config.sample_step))
-        ys = np.arange(0, h, step, dtype=int)
-        xs = np.arange(0, w, step, dtype=int)
-        grid_y, grid_x = np.meshgrid(ys, xs, indexing="ij")
-
-        p0 = np.stack([grid_x.ravel(), grid_y.ravel()], axis=1).astype(np.float32)
-        flow_samples = flow[grid_y, grid_x].reshape(-1, 2).astype(np.float32)
-        valid = np.isfinite(flow_samples).all(axis=1)
-
-        static_mask = self._build_static_mask(h, w, detections_scaled)
-        valid &= static_mask[grid_y, grid_x].reshape(-1)
-
-        p0 = p0[valid]
-        flow_samples = flow_samples[valid]
+        flow_flat = flow.reshape(-1, 2).astype(np.float32)
+        valid = np.isfinite(flow_flat).all(axis=1)
+        flow_samples = flow_flat[valid]
 
         sample_filter_ms = (time.perf_counter() - sample_start) * 1000
 
         warp_start = time.perf_counter()
-        if p0.shape[0] > 0:
-            shift = np.median(flow_samples, axis=0)
-            warp[:, 2] = shift.astype(np.float32)
 
-        if self.scale_gmc != 1:
-            warp[0, 2] /= self.scale_gmc
-            warp[1, 2] /= self.scale_gmc
+        if flow_samples.shape[0] > 0:
+            shift = np.median(flow_samples, axis=0)
+            warp[0, 2] = float(shift[0]) * scale_x
+            warp[1, 2] = float(shift[1]) * scale_y
+
         warp_estimation_ms = (time.perf_counter() - warp_start) * 1000
 
         total_ms = (time.perf_counter() - total_start) * 1000
