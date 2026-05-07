@@ -11,12 +11,14 @@ LOCAL_ULTRALYTICS_ROOT = REPO_ROOT / "ultralytics"
 class BaselineConfig:
     model: str
     tracker: str
+    gmc: str
     conf: float
     iou: float
     imgsz: int
     classes: list[int]
     device: str
     resize: str
+    gmc_downscale: int
 
 @dataclass
 class RaftGMCConfig:

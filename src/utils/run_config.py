@@ -51,11 +51,15 @@ def dump_run_config(path: Path, config: BaselineConfig, sequences: list[str], tr
             "classes": config.classes,
             "device": config.device,
         },
+        "gmc": config.gmc,
         "resize": {
             "imgsz": config.imgsz,
             "mode": config.resize,
         },
         "tracker": tracker_params,
+        "tracker_runtime": {
+            "gmc_downscale": config.gmc_downscale,
+        },
     }
     with path.open("w", encoding="utf-8") as handle:
         yaml.safe_dump(payload, handle, sort_keys=False)
@@ -70,12 +74,14 @@ def build_baseline_config(run_cfg: dict[str, Any]) -> BaselineConfig:
     return BaselineConfig(
         model=str(run_cfg.get("model", default_model_path())),
         tracker=str(Path(str(run_cfg.get("tracker_config", default_tracker_path()))).expanduser().resolve()),
+        gmc=run_cfg.get("gmc", "sparseOptFlow"),
         conf=float(run_cfg.get("conf", 0.25)),
         iou=float(run_cfg.get("iou", 0.7)),
         imgsz=imgsz,
         classes=[int(cls_id) for cls_id in run_cfg.get("classes", [0])],
         device=str(run_cfg["device"]),
         resize=f"letterbox_to_{imgsz}",
+        gmc_downscale=int(run_cfg.get("gmc_downscale", 1)),
     )
 
 def build_raft_gmc_config(section: dict[str, Any]) -> RaftGMCConfig:

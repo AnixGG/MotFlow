@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-from contextlib import nullcontext
 from pathlib import Path
-from typing import Any
 
 from evaluation.metrics import compute_hota_scores, evaluate_sequence, summarize_metrics
 from evaluation.visualization import render_sequence_video
@@ -12,10 +10,8 @@ from utils.logging import setup_logger
 from utils.run_config import build_baseline_config, build_raft_gmc_config, parse_run_settings, dump_run_config, resolve_sequence_dir
 from utils.config import LOCAL_ULTRALYTICS_ROOT, REPO_ROOT
 from utils.env_info import write_env_info
-from utils.io import read_yaml, write_metrics_csv, write_timing_csv
+from utils.io import read_yaml, write_metrics_csv, write_timing_csv, write_yaml
 from utils.timing import attach_raw_timing, build_overall_timing_row
-
-
 
 
 def run_pipeline(config_path: Path, experimental_mode=False) -> None:
@@ -31,6 +27,10 @@ def run_pipeline(config_path: Path, experimental_mode=False) -> None:
         current_mode = "experiment"
 
     tracker_params = read_yaml(Path(config.tracker))
+    tracker_params["gmc_method"] = config.gmc
+    updated_tracker_path = outdir / "tracker.yaml"
+    write_yaml(updated_tracker_path, tracker_params)
+    config.tracker = str(updated_tracker_path)
 
     dump_run_config(outdir / "config.yaml", config, sequences, tracker_params, data_root)
     write_env_info(outdir / "env_info.txt", REPO_ROOT, LOCAL_ULTRALYTICS_ROOT)
@@ -51,24 +51,20 @@ def run_pipeline(config_path: Path, experimental_mode=False) -> None:
     track_dir = outdir / "tracks"
     track_dir.mkdir(parents=True, exist_ok=True)
 
-    gmc_context = nullcontext()
-
-    if experimental_mode:
-        gmc_method = str(run_config.get("gmc", "none")).strip().lower()
-    
-        if gmc_method == "raft":
-            
-            raft_section = run_config.get("raft_gmc", {})
-            raft_config = build_raft_gmc_config(raft_section if isinstance(raft_section, dict) else {})
-            logger.info(
-                "[experiment] gmc=raft model=%s scale_gmc=%s sample_step=%s",
-                raft_config.model_name,
-                raft_config.scale_gmc,
-                raft_config.sample_step,
-            )
-            gmc_context = patch_botsort_gmc(raft_config)
-        else:
-            logger.info("[experiment] gmc=%s", gmc_method)
+    raft_config = None
+    if config.gmc == "raft":
+        raft_section = run_config.get("raft_gmc", {})
+        raft_config = build_raft_gmc_config(raft_section if isinstance(raft_section, dict) else {})
+        logger.info(
+            "[%s] gmc=raft model=%s scale_gmc=%s sample_step=%s",
+            current_mode,
+            raft_config.model_name,
+            raft_config.scale_gmc,
+            raft_config.sample_step,
+        )
+    else:
+        logger.info("[%s] gmc=%s gmc_downscale=%s", current_mode, config.gmc, config.gmc_downscale)
+    gmc_context = patch_botsort_gmc(raft_config, default_downscale=config.gmc_downscale)
 
     accumulators = {}
     hota_pairs = {}
