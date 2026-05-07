@@ -10,7 +10,7 @@ from utils.config import RaftGMCConfig
 
 
 class RaftGMC:
-    def __init__(self, method: str = "raft", scale_gmc: float = 0.5, config: RaftGMCConfig | None = None) -> None:
+    def __init__(self, method: str = "raft", scale_gmc: float = 1, config: RaftGMCConfig | None = None) -> None:
         self.method = method
         self.scale_gmc = float(scale_gmc)
         self.config = config or RaftGMCConfig()

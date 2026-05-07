@@ -31,16 +31,18 @@ def load_yolo_model(model_path: str) -> Any:
     return YOLO(model_path)
 
 @contextmanager
-def patch_botsort_gmc(raft_config: RaftGMCConfig) -> Iterator[None]:
+def patch_botsort_gmc(raft_config: RaftGMCConfig, default_downscale: int= 1) -> Iterator[None]:
     ensure_local_ultralytics()
     import ultralytics.trackers.bot_sort as bot_sort_module
     from ultralytics.trackers.utils.gmc import GMC as DefaultGMC
 
     original_gmc = bot_sort_module.GMC
 
-    def get_gmc(method: str = "none", downscale: int = 1):
+    def get_gmc(method: str = "none", downscale: int | None = None):
         if str(method).lower() == "raft":
             return RaftGMC(method=method, scale_gmc=raft_config.scale_gmc, config=raft_config)
+        if downscale is None:
+            downscale = default_downscale
         return DefaultGMC(method=method, downscale=downscale)
     
     bot_sort_module.GMC = get_gmc
