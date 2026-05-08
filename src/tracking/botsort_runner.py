@@ -26,27 +26,60 @@ def _read_raft_gmc_timing_ms(model: Any) -> float | None:
         return None
 
 
-def run_botsort_sequence_baseline(model: Any, seq_dir: Path, output_path: Path, config: BaselineConfig) -> dict[str, Any]:
-    # # reset
+def _reset_botsort_state(model: Any) -> None:
     predictor = getattr(model, "predictor", None)
     if predictor and getattr(predictor, "trackers", None):
         for tracker in predictor.trackers:
             tracker.reset()
         predictor.vid_path = [None] * len(predictor.trackers)
 
-    result_stream = model.track(
-        source=str(seq_dir / "img1"),
-        tracker=config.tracker,
-        stream=True,
-        persist=True,
-        conf=config.conf,
-        iou=config.iou,
-        imgsz=config.imgsz,
-        device=config.device,
-        classes=config.classes,
-        verbose=False,
-        save=False,
-    )
+
+def _botsort_kwargs(seq_dir: Path, config: BaselineConfig) -> dict[str, Any]:
+    return {
+        "source": str(seq_dir / "img1"),
+        "tracker": config.tracker,
+        "stream": True,
+        "persist": True,
+        "conf": config.conf,
+        "iou": config.iou,
+        "imgsz": config.imgsz,
+        "device": config.device,
+        "classes": config.classes,
+        "verbose": False,
+        "save": False,
+    }
+
+
+def _warmup(model: Any, seq_dir: Path, config: BaselineConfig) -> None:
+    if config.warmup_frames <= 0:
+        return
+
+    result_stream = model.track(**_botsort_kwargs(seq_dir, config))
+    stream_iter = iter(result_stream)
+
+    try:
+        for _ in range(config.warmup_frames):
+            cuda_synchronize(config.device)
+            try:
+                next(stream_iter)
+            except StopIteration:
+                break
+            cuda_synchronize(config.device)
+    finally:
+        close_stream = getattr(result_stream, "close", None)
+        if callable(close_stream):
+            close_stream()
+        cuda_synchronize(config.device)
+
+
+def run_botsort_sequence_baseline(model: Any, seq_dir: Path, output_path: Path, config: BaselineConfig) -> dict[str, Any]:
+    _reset_botsort_state(model)
+    try:
+        _warmup(model, seq_dir, config)
+    finally:
+        _reset_botsort_state(model)
+
+    result_stream = model.track(**_botsort_kwargs(seq_dir, config))
 
     mot_rows = []
     wall_latencies_ms = []
@@ -110,6 +143,7 @@ def run_botsort_sequence_baseline(model: Any, seq_dir: Path, output_path: Path, 
         postprocess_latencies_ms.append(postprocess_ms)
         model_latencies_ms.append(model_ms)
         residual_latencies_ms.append(residual_ms)
+        
         if raft_gmc_ms is not None:
             raft_gmc_latencies_ms.append(raft_gmc_ms)
 

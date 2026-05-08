@@ -19,6 +19,7 @@ class BaselineConfig:
     device: str
     resize: str
     gmc_downscale: int
+    warmup_frames: int
 
 @dataclass
 class RaftGMCConfig:

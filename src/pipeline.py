@@ -45,6 +45,7 @@ def run_pipeline(config_path: Path, experimental_mode=False) -> None:
     logger.info(f"[{current_mode}] sequences=%s", ", ".join(sequences))
     logger.info(f"[{current_mode}] outdir=%s", outdir)
     logger.info(f"[{current_mode}] device=%s", config.device)
+    logger.info(f"[{current_mode}] warmup_frames=%s", config.warmup_frames)
     logger.info(f"[{current_mode}] visualization=%s", "enabled" if vis_enabled else "disabled")
 
     model = load_yolo_model(config.model)

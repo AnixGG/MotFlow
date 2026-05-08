@@ -59,6 +59,7 @@ def dump_run_config(path: Path, config: BaselineConfig, sequences: list[str], tr
         "tracker": tracker_params,
         "tracker_runtime": {
             "gmc_downscale": config.gmc_downscale,
+            "warmup_frames": config.warmup_frames,
         },
     }
     with path.open("w", encoding="utf-8") as handle:
@@ -82,6 +83,7 @@ def build_baseline_config(run_cfg: dict[str, Any]) -> BaselineConfig:
         device=str(run_cfg["device"]),
         resize=f"letterbox_to_{imgsz}",
         gmc_downscale=int(run_cfg.get("gmc_downscale", 1)),
+        warmup_frames=max(0, int(run_cfg.get("warmup_frames", 5))),
     )
 
 def build_raft_gmc_config(section: dict[str, Any]) -> RaftGMCConfig:
