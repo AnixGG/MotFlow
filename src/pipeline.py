@@ -57,9 +57,10 @@ def run_pipeline(config_path: Path, experimental_mode=False) -> None:
         raft_section = run_config.get("raft_gmc", {})
         raft_config = build_raft_gmc_config(raft_section if isinstance(raft_section, dict) else {})
         logger.info(
-            "[%s] gmc=raft model=%s scale_gmc=%s sample_step=%s",
+            "[%s] gmc=raft model=%s image_size=%s scale_gmc=%s sample_step=%s",
             current_mode,
             raft_config.model_name,
+            raft_config.image_size,
             raft_config.scale_gmc,
             raft_config.sample_step,
         )

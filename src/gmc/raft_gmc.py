@@ -15,7 +15,9 @@ class RaftGMC:
         self.method = method
         self.scale_gmc = float(scale_gmc)
         self.config = config or RaftGMCConfig()
-        self.image_size = 128
+        self.image_size = int(self.config.image_size)
+        if self.image_size < 128 or self.image_size % 8 != 0:
+            raise ValueError("RAFT-GMC image_size must be >= 128 and divisible by 8")
         self.last_timing_ms = None
         self.last_timing_breakdown_ms = {}
 
@@ -41,10 +43,7 @@ class RaftGMC:
             scale_y /= self.scale_gmc
 
         h, w = frame.shape[:2]
-        size = max(128, self.image_size)
-        if size % 8:
-            size = ((size + 7) // 8) * 8
-
+        size = self.image_size
         scale_x *= w / size
         scale_y *= h / size
         frame = cv2.resize(frame, (size, size), interpolation=cv2.INTER_LINEAR)

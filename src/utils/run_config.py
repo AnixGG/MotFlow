@@ -89,11 +89,15 @@ def build_baseline_config(run_cfg: dict[str, Any]) -> BaselineConfig:
 def build_raft_gmc_config(section: dict[str, Any]) -> RaftGMCConfig:
     device_raw = section.get("device")
     device = str(device_raw) if device_raw is not None else None
+    image_size = int(section.get("image_size", 128))
+    if image_size < 128 or image_size % 8 != 0:
+        raise ValueError("raft_gmc.image_size must be >= 128 and divisible by 8")
     return RaftGMCConfig(
         model_name=str(section.get("model", "small")),
         device=device,
         mixed_precision=bool(section.get("mixed_precision", False)),
         scale_gmc=float(section.get("scale_gmc", 1)),
+        image_size=image_size,
         sample_step=int(section.get("sample_step", 8)),
         ransac_reproj_threshold=float(section.get("ransac_reproj_threshold", 3)),
     )
