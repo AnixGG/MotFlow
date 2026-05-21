@@ -16,7 +16,7 @@ class RAFTWrapper: # считает dense optical flow между двумя к�
         num_flow_updates=1,
     ) -> None:
         if name not in {"small", "large"}:
-            raise ValueError(f"Unsupported RAFT model size: {name}. Use 'small' or 'large'.")
+            raise ValueError(f"Unsupported RAFT size")
 
         self.name = name
         self.device = torch.device(device or ("cuda" if torch.cuda.is_available() else "cpu"))
@@ -38,15 +38,15 @@ class RAFTWrapper: # считает dense optical flow между двумя к�
         if isinstance(frame, torch.Tensor):
             tensor = frame.detach().clone()
             if tensor.ndim != 3:
-                raise ValueError(f"Expected 3D tensor [C,H,W], got shape={tuple(tensor.shape)}")
+                raise ValueError(f"Expected [C,H,W], got {tuple(tensor.shape)}")
             if tensor.shape[0] != 3:
-                raise ValueError(f"Expected 3 channels, got shape={tuple(tensor.shape)}")
+                raise ValueError(f"Expected 3 channels, got {tuple(tensor.shape)}")
             if tensor.max() > 1:
                 tensor = tensor / 255
             return tensor
 
         if frame.ndim != 3 or frame.shape[2] != 3:
-            raise ValueError(f"Expected frame with shape [H,W,3], got shape={frame.shape}")
+            raise ValueError(f"Expected [H,W,3], got {frame.shape}")
 
         # BGR -> RGB
         rgb = frame[:, :, ::-1].copy()
@@ -58,7 +58,7 @@ class RAFTWrapper: # считает dense optical flow между двумя к�
         image2 = self._frame_to_tensor(frame_curr).unsqueeze(0).to(self.device)
 
         if image1.shape != image2.shape:
-            raise ValueError(f"Frame shapes must match: {tuple(image1.shape)} vs {tuple(image2.shape)}")
+            raise ValueError(f"image1.shape != image2.shape {tuple(image1.shape)} != {tuple(image2.shape)}")
 
         image1, image2 = self.preprocess(image1, image2)
 

@@ -14,19 +14,19 @@ def normalize_sequences(raw_values: Iterable[str]) -> list[str]:
         parts = [item.strip() for item in value.split(",")]
         sequences.extend([item for item in parts if item])
     if not sequences:
-        raise ValueError("No sequences were provided")
+        raise ValueError("No sequences")
     return sequences
 
 
 def parse_run_settings(run_cfg: dict[str, Any]) -> tuple[Path, Path, list[str]]:
     if "data" not in run_cfg:
-        raise ValueError("Missing required config key: data")
+        raise ValueError("Missing key: data")
     
     if "outdir" not in run_cfg:
-        raise ValueError("Missing required config key: outdir")
+        raise ValueError("Missing key: outdir")
     
     if "sequences" not in run_cfg:
-        raise ValueError("Missing required config key: sequences")
+        raise ValueError("Missing key: sequences")
     
     data_root = Path(str(run_cfg["data"])).expanduser().resolve()
     outdir = Path(str(run_cfg["outdir"])).expanduser().resolve()
@@ -37,7 +37,7 @@ def parse_run_settings(run_cfg: dict[str, Any]) -> tuple[Path, Path, list[str]]:
     elif isinstance(raw_sequences, list):
         sequences = normalize_sequences([str(item) for item in raw_sequences])
     else:
-        raise ValueError("Config key sequences must be string or list")
+        raise ValueError("Config key sequences must be string / list")
     return data_root, outdir, sequences
 
 def dump_run_config(path: Path, config: BaselineConfig, sequences: list[str], tracker_params: dict[str, Any], data_root: Path) -> None:
@@ -68,7 +68,7 @@ def dump_run_config(path: Path, config: BaselineConfig, sequences: list[str], tr
 
 def build_baseline_config(run_cfg: dict[str, Any]) -> BaselineConfig:
     if "device" not in run_cfg:
-        raise ValueError("Missing required config key: device")
+        raise ValueError("Missing key: device")
     
     imgsz = int(run_cfg.get("imgsz", 1280))
     
@@ -91,7 +91,7 @@ def build_raft_gmc_config(section: dict[str, Any]) -> RaftGMCConfig:
     device = str(device_raw) if device_raw is not None else None
     image_size = int(section.get("image_size", 128))
     if image_size < 128 or image_size % 8 != 0:
-        raise ValueError("raft_gmc.image_size must be >= 128 and divisible by 8")
+        raise ValueError("raft_gmc.image_size must be >= 128 and divisible 8")
     return RaftGMCConfig(
         model_name=str(section.get("model", "small")),
         device=device,
@@ -107,7 +107,7 @@ def resolve_sequence_dir(data_root: Path, sequence: str) -> Path:
     img_dir = seq_dir / "img1"
     gt_path = seq_dir / "gt" / "gt.txt"
     if not img_dir.exists():
-        raise FileNotFoundError(f"Missing frames directory: {img_dir}")
+        raise FileNotFoundError(f"Missing directory: {img_dir}")
     if not gt_path.exists():
-        raise FileNotFoundError(f"Missing ground truth file: {gt_path}")
+        raise FileNotFoundError(f"Missing gt file: {gt_path}")
     return seq_dir
