@@ -1,38 +1,28 @@
 from __future__ import annotations
 
-import sys
-
 from contextlib import contextmanager
-from typing import Iterator, Any
+from typing import Any, Iterator
 
 from gmc.raft_gmc import RaftGMC
-from utils.config import RaftGMCConfig, LOCAL_ULTRALYTICS_ROOT
-
-
-def ensure_local_ultralytics() -> None:
-    if LOCAL_ULTRALYTICS_ROOT.exists():
-        local_path = str(LOCAL_ULTRALYTICS_ROOT)
-        if local_path not in sys.path:
-            sys.path.insert(0, local_path)
+from utils.config import RaftGMCConfig
 
 
 def get_ultralytics_version() -> str:
-    ensure_local_ultralytics()
     try:
         import ultralytics
     except Exception as e:
         return "unknown: exception"
     return str(getattr(ultralytics, "__version__", "unknown"))
 
+
 def load_yolo_model(model_path: str) -> Any:
-    ensure_local_ultralytics()
     from ultralytics import YOLO
 
     return YOLO(model_path)
 
+
 @contextmanager
 def patch_botsort_gmc(raft_config: RaftGMCConfig, default_downscale: int= 1) -> Iterator[None]:
-    ensure_local_ultralytics()
     import ultralytics.trackers.bot_sort as bot_sort_module
     from ultralytics.trackers.utils.gmc import GMC as DefaultGMC
 

@@ -15,7 +15,7 @@ def git_output(*args: str, cwd: Path) -> str:
         return "unknown"
 
 
-def write_env_info(path: Path, repo_root: Path, ultralytics_root: Path) -> None:
+def write_env_info(path: Path, repo_root: Path) -> None:
     import torch
 
     gpu_name = "cpu"
@@ -25,7 +25,6 @@ def write_env_info(path: Path, repo_root: Path, ultralytics_root: Path) -> None:
     lines = [
         f"repo_root: {repo_root}",
         f"repo_git_commit: {git_output('git', 'rev-parse', 'HEAD', cwd=repo_root)}",
-        f"ultralytics_repo_commit: {git_output('git', 'rev-parse', 'HEAD', cwd=ultralytics_root)}",
         f"python: {platform.python_version()}",
         f"platform: {platform.platform()}",
         f"torch: {torch.__version__}",

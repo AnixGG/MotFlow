@@ -8,7 +8,7 @@ from tracking.botsort_runner import run_botsort_sequence_baseline
 from tracking.ultralytics_runtime import patch_botsort_gmc, load_yolo_model
 from utils.logging import setup_logger
 from utils.run_config import build_baseline_config, build_raft_gmc_config, parse_run_settings, dump_run_config, resolve_sequence_dir
-from utils.config import LOCAL_ULTRALYTICS_ROOT, REPO_ROOT
+from utils.config import REPO_ROOT
 from utils.env_info import write_env_info
 from utils.io import read_yaml, write_metrics_csv, write_timing_csv, write_yaml
 from utils.timing import attach_raw_timing, build_overall_timing_row
@@ -33,7 +33,7 @@ def run_pipeline(config_path: Path, experimental_mode=False) -> None:
     config.tracker = str(updated_tracker_path)
 
     dump_run_config(outdir / "config.yaml", config, sequences, tracker_params, data_root)
-    write_env_info(outdir / "env_info.txt", REPO_ROOT, LOCAL_ULTRALYTICS_ROOT)
+    write_env_info(outdir / "env_info.txt", REPO_ROOT)
 
     vis_config = run_config.get("visualization", {}) if isinstance(run_config.get("visualization", {}), dict) else {}
     vis_enabled = bool(vis_config.get("enabled", False))

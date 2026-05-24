@@ -4,7 +4,6 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-LOCAL_ULTRALYTICS_ROOT = REPO_ROOT / "ultralytics"
 
 
 @dataclass
