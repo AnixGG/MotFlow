@@ -1,9 +1,31 @@
-*__pycache__
-tmp/*
-*.txt
+# Python/cache
+__pycache__/
+*__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+*.cache
+
+# OS/editor
+.DS_Store
+
+# Local scratch files
+tmp/
+configs/* copy.yaml
+
+# External source checkouts
+ultralytics/
+
+# Datasets and raw archives
+dataset/
+*.zip
+
+# Model weights and large generated artifacts
+models/
+*.pt
+*.pth
+*.onnx
+*.engine
+
+# Runtime outputs
+*.log
 *.mp4
-*.csv
-*.jpg
-__pycache__
-dataset/*
-!requirements.txt
