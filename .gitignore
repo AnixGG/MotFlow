@@ -10,7 +10,6 @@ __pycache__/
 
 # Local scratch files
 tmp/
-configs/* copy.yaml
 
 # External source checkouts
 ultralytics/
