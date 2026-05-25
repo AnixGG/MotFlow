@@ -4,6 +4,8 @@
 
 По описанию авторов SportsMOT содержит 240 видеопоследовательностей, более 150 тысяч кадров и более 1.6 миллиона bounding boxes. Официальный split состоит из 45 train, 45 validation и 150 test sequences. Разбиение сделано так, чтобы последовательности из одной игры не попадали в разные split.
 
+Датасет не хранится в этом репозитории. Официальная статья ссылается на страницу SportsMOT проекта DeeperAction, а она отправляет к странице соревнования CodaLab и официальному GitHub-репозиторию SportsMOT. Также существует страница SportsMOT на Hugging Face, где указан полный размер датасета около 36.5 GB. В экспериментах автора для удобства использовалась приватная копия датасета на Kaggle, но это не является обязательной частью проекта: pipeline работает с любой локальной/смонтированной копией SportsMOT, если она приведена к ожидаемой структуре.
+
 ## Использование в этом проекте
 
 В этом проекте SportsMOT используется в двух местах:
@@ -165,5 +167,8 @@ SportsMOT сложнее для трекинга, чем многие pedestrian
 
 ## Источники
 
-- SportsMOT paper: https://arxiv.org/abs/2304.05170
-- Official dataset page / Codabench description: https://www.codabench.org/competitions/13077/
+- статья SportsMOT: https://arxiv.org/abs/2304.05170
+- страница SportsMOT проекта DeeperAction: https://deeperaction.github.io/datasets/sportsmot.html
+- официальный GitHub SportsMOT: https://github.com/MCG-NJU/SportsMOT
+- CodaLab competition: https://codalab.lisn.upsaclay.fr/competitions/12424
+- страница SportsMOT на Hugging Face: https://huggingface.co/datasets/MCG-NJU/SportsMOT

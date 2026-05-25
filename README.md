@@ -42,8 +42,8 @@ scripts/
   run_experiment.py            запуск experimental pipeline
 
 notebooks/
-  run.ipynb                    ноутбук для запуска экспериментов
-  train-yolo-sportsmot.ipynb   ноутбук дообучения YOLO11 на SportsMOT
+  run.ipynb                    Colab-bootstrap для запуска экспериментов
+  train-yolo-sportsmot.ipynb   Kaggle-ноутбук дообучения YOLO11
 
 results/
   pretrained_models/           результаты обучения YOLO11
@@ -51,6 +51,7 @@ results/
 
 docs/
   dataset.md                   описание SportsMOT и структуры данных
+  model_weights.md             ссылки и инструкция для весов YOLO11
 ```
 
 ## Установка
@@ -71,7 +72,7 @@ bash install.sh
 
 ## Данные
 
-Эксперименты рассчитаны на структуру SportsMOT:
+Эксперименты рассчитаны на структуру SportsMOT. Сам датасет не хранится в репозитории и может требовать отдельного доступа/регистрации у авторов датасета.
 
 ```text
 dataset/
@@ -98,6 +99,8 @@ dataset/
 - `outdir` — директория для сохранения результатов;
 - `device` — устройство, например `cuda` или `cpu`.
 
+Веса обученных моделей не хранятся в git. Ссылки на Google Drive и инструкция по размещению файлов описаны в `docs/model_weights.md`.
+
 Запуск baseline:
 
 ```bash
@@ -110,11 +113,13 @@ python3 scripts/run_baseline.py --config configs/run_baseline.yaml
 python3 scripts/run_experiment.py --config configs/run_experiment.yaml
 ```
 
-Также для интерактивного запуска можно использовать ноутбук:
+Также для запуска в Google Colab можно использовать ноутбук:
 
 ```text
 notebooks/run.ipynb
 ```
+
+Это bootstrap-ноутбук: его можно загрузить в Colab отдельно, после чего он клонирует репозиторий, устанавливает зависимости из `requirements.txt`, проверяет пути к весам и датасету и запускает pipeline. Датасет SportsMOT и веса YOLO11 нужно подготовить отдельно: ноутбук не содержит универсального публичного скачивания датасета.
 
 ## Конфигурация
 
@@ -220,11 +225,32 @@ RAFT-GMC реализован в `src/gmc/raft_gmc.py` и подключаетс
 
 ## Обучение YOLO11
 
-Дообучение детекторов YOLO11 на SportsMOT вынесено в ноутбук:
+Дообучение детекторов YOLO11 на SportsMOT вынесено в Kaggle-ноутбук:
 
 ```text
 notebooks/train-yolo-sportsmot.ipynb
 ```
+
+Ноутбук выполняет подготовку датасета в YOLO-формат и запускает обучение Ultralytics YOLO11. Он рассчитан на окружение Kaggle Notebook: SportsMOT подключается как Kaggle Input, а рабочие файлы создаются в `/kaggle/working`.
+
+Основные параметры обучения задаются в начале ноутбука:
+
+```python
+MODEL_NAME = "yolo11s.pt"
+EPOCHS = 100
+IMGSZ = 640
+BATCH = 16
+```
+
+Для получения детекторов разных размеров ноутбук запускался несколько раз с разными значениями:
+
+```python
+MODEL_NAME = "yolo11n.pt"
+MODEL_NAME = "yolo11s.pt"
+MODEL_NAME = "yolo11m.pt"
+```
+
+Разметка SportsMOT преобразуется из MOTChallenge-подобного `gt/gt.txt` в YOLO-формат. Используется один целевой класс — `player`.
 
 Сохраненные результаты обучения лежат в:
 
@@ -240,6 +266,8 @@ results/pretrained_models/
 - `BoxPR_curve.png`, `BoxF1_curve.png`, `BoxP_curve.png`, `BoxR_curve.png`;
 - `confusion_matrix.png`;
 - `val_batch*_pred.jpg` и `val_batch*_labels.jpg`.
+
+Веса моделей `.pt` не хранятся в git из-за размера файлов. Для запуска трекинга нужно скачать веса отдельно, положить их локально или на Google Drive и указать путь в поле `model` YAML-конфига. Подробнее: `docs/model_weights.md`.
 
 ## Результаты экспериментов
 
