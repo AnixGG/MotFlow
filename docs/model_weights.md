@@ -4,7 +4,7 @@
 
 ## Ссылки на Google Drive
 
-- YOLO11n SportsMOT: `https://drive.google.com/file/d/1QcLReoL6Cd-gW3al_0219zcWSQv3GW92/view?usp=sharing`
+- YOLO11n SportsMOT: `https://drive.google.com/file/d/1RbC3D9emgMee1VnjczDspzn8spKwXOp9/view?usp=sharing`
 - YOLO11s SportsMOT: `https://drive.google.com/file/d/1Kjo-ei1KV7nVa_jmnVzB8YWVu9tp0BqW/view?usp=sharing`
 - YOLO11m SportsMOT: `https://drive.google.com/file/d/1mHuZBesRudoCe8dBUs9fcs2tKNbAhJBc/view?usp=sharing`
 

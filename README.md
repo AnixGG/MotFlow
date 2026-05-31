@@ -60,6 +60,7 @@ docs/
 
 ```bash
 pip install -r requirements.txt
+pip install trackeval==1.3.0 --no-deps
 ```
 
 Для окружения с CUDA 12.8 приведен пример установки:
@@ -68,7 +69,7 @@ pip install -r requirements.txt
 bash install.sh
 ```
 
-`install.sh` устанавливает PyTorch/torchvision под CUDA 12.8, затем зависимости из `requirements.txt`. В других окружениях, например в Colab или на другой версии CUDA, версию PyTorch может потребоваться выбрать отдельно.
+`install.sh` устанавливает PyTorch/torchvision под CUDA 12.8, затем зависимости из `requirements.txt` и отдельно `trackeval==1.3.0 --no-deps`. В других окружениях, например в Colab или на другой версии CUDA, версию PyTorch может потребоваться выбрать отдельно.
 
 ## Данные
 
@@ -119,7 +120,7 @@ python3 scripts/run_experiment.py --config configs/run_experiment.yaml
 notebooks/run.ipynb
 ```
 
-Это bootstrap-ноутбук: его можно загрузить в Colab отдельно, после чего он клонирует репозиторий, устанавливает зависимости из `requirements.txt`, проверяет пути к весам и датасету и запускает pipeline. Датасет SportsMOT и веса YOLO11 нужно подготовить отдельно: ноутбук не содержит универсального публичного скачивания датасета.
+Это bootstrap-ноутбук: его можно загрузить в Colab отдельно, после чего он клонирует репозиторий, устанавливает зависимости из `requirements.txt`, отдельно ставит TrackEval с `--no-deps`, проверяет пути к весам и датасету и запускает pipeline. Датасет SportsMOT и веса YOLO11 нужно подготовить отдельно: ноутбук не содержит универсального публичного скачивания датасета.
 
 ## Конфигурация
 
