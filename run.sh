@@ -111,7 +111,8 @@ prepare_val() {
       fetch "https://huggingface.co/datasets/MCG-NJU/SportsMOT/resolve/$val_commit/dataset/val.tar" "$archive"
       printf '%s  %s\n' "$val_sha256" "$archive" | sha256sum --check
       mkdir -p -- "$extracted"
-      tar -xf "$archive" -C "$extracted"
+      tar --pax-option='delete=LIBARCHIVE.xattr.com.apple.quarantine' \
+        --exclude='._*' --exclude='*/._*' -xf "$archive" -C "$extracted"
       touch "$extracted/.ready"
     fi
     printf '%s\n' "$val_commit" > "$job/sportsmot-val-commit.txt"
