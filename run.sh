@@ -79,7 +79,8 @@ setup_python() {
   signature=$( { python3 --version; sha256sum "$root/run.sh" "$root/requirements.txt"; } | sha256sum )
   if [[ ! -x "$python" || ! -f "$cache/env.signature" || $(cat "$cache/env.signature") != "$signature" ]]; then
     echo "Setting up the Colab environment with $(python3 --version)."
-    python3 -m venv "$cache/venv"
+    python3 -m venv --without-pip "$cache/venv"
+    python3 -m pip --python "$python" install --disable-pip-version-check pip
     "$python" -m pip install --disable-pip-version-check \
       torch==2.10.0+cu128 torchvision==0.25.0+cu128 --index-url https://download.pytorch.org/whl/cu128
     "$python" -m pip install --disable-pip-version-check -r "$root/requirements.txt" \
