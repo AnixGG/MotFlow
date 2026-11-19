@@ -19,12 +19,14 @@ class RaftGMC:
         if self.image_size < 128 or self.image_size % 8 != 0:
             raise ValueError("RAFT-GMC image_size must be >= 128 and divisible by 8")
         self.last_timing_ms = None
+        self.onnx_error: Exception | None = None
         self.last_timing_breakdown_ms = {}
 
         self.raft = RAFTWrapper(
             name=self.config.model_name,
             device=self.config.device,
             mixed_precision=self.config.mixed_precision,
+            onnx_model=self.config.onnx_model,
         )
         self.prev_frame: np.ndarray | None = None
         self.initializedFirstFrame = False
@@ -87,7 +89,13 @@ class RaftGMC:
 
         cuda_synchronize(getattr(self.raft, "device", None))
         raft_start = time.perf_counter()
-        flow = self.raft(self.prev_frame, frame)  # low-res [H/8, W/8, 2], values in resized-frame pixels
+        try:
+            flow = self.raft(self.prev_frame, frame)  # [H, W, 2], values in resized-frame pixels
+        except Exception as error:
+            # Ultralytics may substitute an identity transform after an error in apply.
+            if self.config.onnx_model is not None:
+                self.onnx_error = error
+            raise
         cuda_synchronize(getattr(self.raft, "device", None))
         raft_infer_ms = (time.perf_counter() - raft_start) * 1000
 

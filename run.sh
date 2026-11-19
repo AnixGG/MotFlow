@@ -11,6 +11,7 @@ Upload these two files first:
   /content/v_00HRwkvvjtQ_c001.txt
 
 Run `bash run.sh benchmark` for the full YOLO11m comparison instead.
+Run `bash run.sh onnx` for sparse 8x, RAFT PyTorch and RAFT ONNX CUDA on YOLO11s.
 
 Optional environment variables:
   MOT_CHECKPOINT     yolo11m_best, yolo11s_best, yolo11n_best, yolo11n_last, yolo11n_10epoch
@@ -25,14 +26,16 @@ HELP
   exit 0
 fi
 task=${1:-provenance}
-if [[ $# -gt 1 || "$task" != provenance && "$task" != benchmark ]]; then
-  echo 'Usage: bash run.sh [provenance|benchmark|--help]' >&2
+if [[ $# -gt 1 || "$task" != provenance && "$task" != benchmark && "$task" != onnx ]]; then
+  echo 'Usage: bash run.sh [provenance|benchmark|onnx|--help]' >&2
   exit 2
 fi
 
 cd -- "$(dirname -- "${BASH_SOURCE[0]}")"
 root=$PWD
-checkpoint=${MOT_CHECKPOINT:-yolo11m_best}
+default_checkpoint=yolo11m_best
+if [[ "$task" == onnx ]]; then default_checkpoint=yolo11s_best; fi
+checkpoint=${MOT_CHECKPOINT:-$default_checkpoint}
 cache=${MOT_CACHE_DIR:-/content/motflow-cache}
 results=${MOT_RESULTS_DIR:-/content/motflow-results}
 kit_commit=b06cfb4aacb0bb16c5778ac4ddb0d70ec6835444
@@ -53,6 +56,9 @@ if [[ "$task" == provenance ]]; then
   [[ -f "$archive_track" ]] || fail "Upload the archived YOLO11n none track to $archive_track."
   [[ $(sha256sum < "$archive_track") == "$provenance_sha256 "* ]] || fail "Wrong archived track file: $archive_track. Use the experiments805nano YOLO11n none track."
   job_name=yolo11n-provenance
+elif [[ "$task" == onnx ]]; then
+  [[ -z ${MOT_METHOD:-} ]] || fail 'The onnx benchmark always compares all three methods.'
+  job_name="$checkpoint-onnx"
 else
   job_name=$checkpoint
 fi
@@ -150,15 +156,32 @@ run_benchmark() {
   )
   if [[ -n ${MOT_SEQUENCE:-} ]]; then args+=(--sequence "$MOT_SEQUENCE"); fi
   if [[ -n ${MOT_METHOD:-} ]]; then args+=(--method "$MOT_METHOD"); fi
+  if [[ "$task" == onnx ]]; then
+    args+=(--method sparse8 --method raft_large128 --method raft_large128_onnx
+      --raft-onnx "$job/raft_export/raft_large128.onnx")
+  fi
   # Fail on a wrong checkpoint before the large dataset download.
   "$python" scripts/rerun_verified_weights.py "${args[@]}" --data "${MOT_VAL:-$cache}" --dry-run > "$job/plan.yaml"
   prepare_val
+  if [[ "$task" == onnx ]]; then
+    "$python" -m pip install --disable-pip-version-check onnx==1.20.1 onnxruntime-gpu==1.22.0
+    "$python" -m pip check
+    "$python" -m pip freeze > "$job/pip-freeze.txt"
+    "$python" scripts/export_raft_onnx.py --images "$MOT_VAL/${MOT_SEQUENCE:-$provenance_clip}/img1" \
+      --out "$job/raft_export"
+  fi
   "$python" scripts/rerun_verified_weights.py "${args[@]}" --data "$MOT_VAL"
   if [[ -z ${MOT_METHOD:-} && -z ${MOT_SEQUENCE:-} ]]; then
     "$python" scripts/compare_gmc.py \
       --baseline "$job/benchmark/sparse8/trackeval" \
       --candidate "$job/benchmark/raft_large128/trackeval" \
       --out "$job/comparison"
+    if [[ "$task" == onnx ]]; then
+      "$python" scripts/compare_gmc.py \
+        --baseline "$job/benchmark/sparse8/trackeval" \
+        --candidate "$job/benchmark/raft_large128_onnx/trackeval" \
+        --out "$job/comparison_onnx"
+    fi
   fi
 }
 

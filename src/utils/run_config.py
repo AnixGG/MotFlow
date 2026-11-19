@@ -100,6 +100,7 @@ def build_raft_gmc_config(section: dict[str, Any]) -> RaftGMCConfig:
         image_size=image_size,
         sample_step=int(section.get("sample_step", 8)),
         ransac_reproj_threshold=float(section.get("ransac_reproj_threshold", 3)),
+        onnx_model=Path(section["onnx_model"]).resolve(strict=True) if section.get("onnx_model") else None,
     )
 
 def resolve_sequence_dir(data_root: Path, sequence: str) -> Path:

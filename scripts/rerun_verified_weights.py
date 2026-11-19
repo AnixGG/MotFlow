@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import configparser
+import csv
 import hashlib
 from pathlib import Path
 import subprocess
@@ -17,6 +18,7 @@ METHODS = {
     "sparse4": {"gmc": "sparseOptFlow", "gmc_downscale": 4},
     "sparse8": {"gmc": "sparseOptFlow", "gmc_downscale": 8},
     "raft_large128": {"gmc": "raft"},
+    "raft_large128_onnx": {"gmc": "raft"},
     "sift2": {"gmc": "sift", "gmc_downscale": 2},
 }
 
@@ -30,6 +32,7 @@ def parse_args(checkpoints: dict) -> argparse.Namespace:
     parser.add_argument("--out", type=Path, required=True, help="New directory for these runs")
     parser.add_argument("--device", default="cuda:0", help="cuda or cuda:N, or cpu for a smoke test")
     parser.add_argument("--method", action="append", choices=METHODS, help="Repeat per method. Default: sparse8 and raft_large128.")
+    parser.add_argument("--raft-onnx", type=Path, help="Validated RAFT-large ONNX graph for the raft_large128_onnx method")
     parser.add_argument("--sequence", action="append", help="Repeat for a subset. Default: all 45 val clips.")
     parser.add_argument("--dry-run", action="store_true", help="Check the weight hash and print the configs without requiring images")
     return parser.parse_args()
@@ -68,8 +71,10 @@ def make_config(base: dict, method: str, args: argparse.Namespace, sequences: li
         "tracker_config": str(ROOT / "configs/botsort_baseline.yaml"),
         "visualization": {"enabled": False},
     }
-    if method == "raft_large128":
+    if config["gmc"] == "raft":
         config["raft_gmc"] = {**config["raft_gmc"], "model": "large", "device": args.device}
+        if method == "raft_large128_onnx":
+            config["raft_gmc"]["onnx_model"] = str(args.raft_onnx.resolve())
     else:
         config.pop("raft_gmc", None)
     return config
@@ -90,6 +95,8 @@ def run() -> None:
     if unknown:
         raise ValueError(f"Unknown SportsMOT val sequences: {sorted(unknown)}")
     methods = dict.fromkeys(args.method or ("sparse8", "raft_large128"))
+    if "raft_large128_onnx" in methods and args.raft_onnx is None:
+        raise ValueError("raft_large128_onnx requires --raft-onnx")
     configs = {method: make_config(base, method, args, sequences, weight, digest) for method in methods}
     if args.dry_run:
         print(yaml.safe_dump(configs, sort_keys=False), end="")
@@ -97,6 +104,8 @@ def run() -> None:
 
     if args.out.exists():
         raise FileExistsError(f"Output already exists: {args.out}")
+    if "raft_large128_onnx" in methods and not args.raft_onnx.is_file():
+        raise FileNotFoundError(args.raft_onnx)
     kit = args.trackeval_kit.resolve()
     if not (kit / "trackeval/__init__.py").is_file():
         raise ValueError(f"Missing official TrackEval package in {kit}")
@@ -110,6 +119,7 @@ def run() -> None:
             raise ValueError(f"CUDA device {args.device} is unavailable")
 
     args.out.mkdir(parents=True)
+    summary = []
     for index, (method, config) in enumerate(configs.items(), 1):
         print(f"[Benchmark {index}/{len(configs)}] {method}: tracking {len(sequences)} clips", flush=True)
         run_dir = Path(config["outdir"])
@@ -126,6 +136,23 @@ def run() -> None:
             evaluate.extend(("--sequence", sequence))
         print(f"[Benchmark {index}/{len(configs)}] {method}: running TrackEval", flush=True)
         subprocess.run(evaluate, check=True)
+        with (run_dir / "trackeval/metrics.csv").open(newline="") as handle:
+            quality = next(row for row in csv.DictReader(handle) if row["sequence"] == "OVERALL")
+        with (run_dir / "timing.csv").open(newline="") as handle:
+            timing = next(row for row in csv.DictReader(handle) if row["sequence"] == "OVERALL")
+        summary.append({
+            "method": method,
+            "frames": timing["frames"],
+            **{key: quality[key] for key in ("HOTA", "IDF1", "AssA", "DetA", "IDS")},
+            **{key: timing[key] for key in (
+                "wall_latency_ms_mean", "wall_latency_ms_p95", "wall_over_40ms_fraction",
+                "raft_gmc_latency_ms_mean",
+            )},
+        })
+    with (args.out / "summary.csv").open("x", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=summary[0])
+        writer.writeheader()
+        writer.writerows(summary)
 
 
 if __name__ == "__main__":

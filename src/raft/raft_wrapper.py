@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Literal
 
 import numpy as np
 import torch
-import torch.nn.functional as F
 from torchvision.models.optical_flow import Raft_Large_Weights, Raft_Small_Weights, raft_large, raft_small
 
 class RAFTWrapper: # считает dense optical flow между двумя кадрами
@@ -14,6 +14,7 @@ class RAFTWrapper: # считает dense optical flow между двумя к�
         device: str | None = None,
         mixed_precision: bool = False,
         num_flow_updates=1,
+        onnx_model: Path | None = None,
     ) -> None:
         if name not in {"small", "large"}:
             raise ValueError(f"Unsupported RAFT size")
@@ -23,16 +24,20 @@ class RAFTWrapper: # считает dense optical flow между двумя к�
         self.mixed_precision = bool(mixed_precision and self.device.type == "cuda")
         self.num_flow_updates = num_flow_updates
 
-        if name == "small":
-            weights = Raft_Small_Weights.DEFAULT
-            self.model = raft_small(weights=weights, progress=False)
-        else:
-            weights = Raft_Large_Weights.DEFAULT
-            self.model = raft_large(weights=weights, progress=False)
-
-        self.model.mask_predictor = None
+        weights = Raft_Small_Weights.DEFAULT if name == "small" else Raft_Large_Weights.DEFAULT
         self.preprocess = weights.transforms()
-        self.model = self.model.to(self.device).eval()
+        self.onnx = None
+        if onnx_model is not None:
+            if mixed_precision or num_flow_updates != 1:
+                raise ValueError("The RAFT ONNX graph requires FP32 and one flow update")
+            from raft.onnx_flow import ONNXFlow
+
+            self.onnx = ONNXFlow(onnx_model, self.device)
+        else:
+            build = raft_small if name == "small" else raft_large
+            self.model = build(weights=weights, progress=False)
+            self.model.mask_predictor = None
+            self.model = self.model.to(self.device).eval()
 
     def _frame_to_tensor(self, frame: np.ndarray | torch.Tensor) -> torch.Tensor:
         if isinstance(frame, torch.Tensor):
@@ -53,23 +58,25 @@ class RAFTWrapper: # считает dense optical flow между двумя к�
         tensor = torch.from_numpy(rgb).permute(2, 0, 1).contiguous().float() / 255
         return tensor
 
-    def infer(self, frame_prev: np.ndarray | torch.Tensor, frame_curr: np.ndarray | torch.Tensor) -> np.ndarray:
+    def prepare_pair(self, frame_prev: np.ndarray | torch.Tensor, frame_curr: np.ndarray | torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         image1 = self._frame_to_tensor(frame_prev).unsqueeze(0).to(self.device)
         image2 = self._frame_to_tensor(frame_curr).unsqueeze(0).to(self.device)
 
         if image1.shape != image2.shape:
             raise ValueError(f"image1.shape != image2.shape {tuple(image1.shape)} != {tuple(image2.shape)}")
 
-        image1, image2 = self.preprocess(image1, image2)
+        return self.preprocess(image1, image2)
 
+    def infer(self, frame_prev: np.ndarray | torch.Tensor, frame_curr: np.ndarray | torch.Tensor) -> np.ndarray:
+        image1, image2 = self.prepare_pair(frame_prev, frame_curr)
         with torch.inference_mode():
-            if self.mixed_precision:
+            if self.onnx is not None:
+                flow = self.onnx(image1, image2)
+            elif self.mixed_precision:
                 with torch.autocast(device_type="cuda", dtype=torch.float16):
-                    flow_predictions = self.model(image1, image2, num_flow_updates=self.num_flow_updates)
+                    flow = self.model(image1, image2, num_flow_updates=self.num_flow_updates)[-1]
             else:
-                flow_predictions = self.model(image1, image2, num_flow_updates=self.num_flow_updates)
-
-        flow = flow_predictions[-1] # [1,2,h,w]
+                flow = self.model(image1, image2, num_flow_updates=self.num_flow_updates)[-1]
 
         flow = flow[0] # [2,h,w]
         return flow.permute(1, 2, 0).detach().cpu().numpy().astype(np.float32)

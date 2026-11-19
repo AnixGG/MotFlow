@@ -29,6 +29,7 @@ class RaftGMCConfig:
     image_size: int = 128
     sample_step: int = 8
     ransac_reproj_threshold: float = 3
+    onnx_model: Path | None = None
 
 def default_model_path() -> Path | str:
     local_weight = REPO_ROOT / "models" / "detector" / "yolo11n.pt"

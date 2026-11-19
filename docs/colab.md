@@ -48,3 +48,14 @@ MOT_METHOD=sift2 bash run.sh benchmark
 # Полное сравнение на YOLO11n best
 MOT_CHECKPOINT=yolo11n_best MOT_WEIGHTS=/content/yolo11n_sportsmot_best.pt bash run.sh benchmark
 ```
+
+## Пилот RAFT ONNX
+
+На одной T4 сравниваются sparse 8×, RAFT-large 128 с PyTorch и RAFT-large 128 с ONNX Runtime CUDA. YOLO11s best и его встроенные ReID-признаки используются во всех трёх режимах. В ONNX экспортируется одно обновление потока в FP32. Перед трекингом скрипт проверяет разницу медианных сдвигов на реальных парах кадров и сохраняет профиль распределения операторов по устройствам.
+
+```bash
+git pull --ff-only origin workspace
+MOT_SEQUENCE=v_00HRwkvvjtQ_c001 bash run.sh onnx
+```
+
+В архиве результатов смотрите `raft_export/parity.json` и `benchmark/summary.csv`. Сводка содержит HOTA, IDF1, среднюю задержку, p95 и долю кадров дольше 40 мс. После успешной проверки на одном клипе команда `bash run.sh onnx` повторяет сравнение на всех 45 клипах. Первый замер скорости считается пилотным.

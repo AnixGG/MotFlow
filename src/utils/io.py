@@ -51,6 +51,7 @@ def write_timing_csv(path: Path, summaries: list[dict[str, Any]]) -> None:
         "wall_latency_ms_std",
         "wall_latency_ms_p50",
         "wall_latency_ms_p95",
+        "wall_over_40ms_fraction",
         "wall_fps_mean",
         "preprocess_latency_ms_mean",
         "preprocess_latency_ms_std",

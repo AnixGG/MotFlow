@@ -17,6 +17,9 @@ def _read_raft_gmc_timing_ms(model: Any) -> float | None:
         return None
 
     gmc = getattr(trackers[0], "gmc", None)
+    error = getattr(gmc, "onnx_error", None)
+    if error is not None:
+        raise RuntimeError("RAFT ONNX failed inside BoT-SORT") from error
     value = getattr(gmc, "last_timing_ms", None)
     if value is None:
         return None
