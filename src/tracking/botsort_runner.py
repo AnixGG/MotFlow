@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -72,7 +73,13 @@ def _warmup(model: Any, seq_dir: Path, config: BaselineConfig) -> None:
         cuda_synchronize(config.device)
 
 
-def run_botsort_sequence_baseline(model: Any, seq_dir: Path, output_path: Path, config: BaselineConfig) -> dict[str, Any]:
+def run_botsort_sequence_baseline(
+    model: Any,
+    seq_dir: Path,
+    output_path: Path,
+    config: BaselineConfig,
+    on_progress: Callable[[int], None] | None = None,
+) -> dict[str, Any]:
     _reset_botsort_state(model)
     try:
         _warmup(model, seq_dir, config)
@@ -91,6 +98,7 @@ def run_botsort_sequence_baseline(model: Any, seq_dir: Path, output_path: Path, 
     raft_gmc_latencies_ms = []
 
     frame_idx = 0
+    next_progress = time.monotonic() + 15
     stream_iter = iter(result_stream)
     while True:
         cuda_synchronize(config.device)
@@ -146,6 +154,11 @@ def run_botsort_sequence_baseline(model: Any, seq_dir: Path, output_path: Path, 
         
         if raft_gmc_ms is not None:
             raft_gmc_latencies_ms.append(raft_gmc_ms)
+
+        # Log after recording the frame latency to keep reporting out of the measurement.
+        if on_progress is not None and time.monotonic() >= next_progress:
+            on_progress(frame_idx)
+            next_progress = time.monotonic() + 15
 
     write_mot_rows(output_path, mot_rows)
     return {

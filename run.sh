@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+export PYTHONUNBUFFERED=1
 
 if [[ ${1:-} == --help ]]; then
   cat <<'HELP'
@@ -65,6 +66,7 @@ kit_root="$cache/sportsmot-kit-$kit_commit"
 kit="$kit_root/codes/evaluation/TrackEval"
 python="$cache/venv/bin/python"
 job=$(mktemp -d "$results/$job_name-$(date -u +%Y%m%dT%H%M%SZ)-XXXXXX")
+echo "Live log: $job/colab.log"
 
 fetch() {
   local url=$1 target=$2
@@ -109,8 +111,10 @@ prepare_val() {
     if [[ ! -f "$extracted/.ready" ]]; then
       echo 'Downloading the official SportsMOT val archive (6.59 GB).'
       fetch "https://huggingface.co/datasets/MCG-NJU/SportsMOT/resolve/$val_commit/dataset/val.tar" "$archive"
+      echo 'Checking the SportsMOT archive SHA-256.'
       printf '%s  %s\n' "$val_sha256" "$archive" | sha256sum --check
       mkdir -p -- "$extracted"
+      echo 'Extracting SportsMOT frames.'
       tar --pax-option='delete=LIBARCHIVE.xattr.com.apple.quarantine' \
         --exclude='._*' --exclude='*/._*' -xf "$archive" -C "$extracted"
       touch "$extracted/.ready"

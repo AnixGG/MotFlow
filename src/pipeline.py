@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import configparser
+import time
+from datetime import timedelta
 from pathlib import Path
 
 from evaluation.metrics import compute_hota_scores, evaluate_sequence, summarize_metrics
@@ -12,6 +15,15 @@ from utils.config import REPO_ROOT
 from utils.env_info import write_env_info
 from utils.io import read_yaml, write_metrics_csv, write_timing_csv, write_yaml
 from utils.timing import attach_raw_timing, build_overall_timing_row
+
+
+def _sequence_frame_count(seq_dir: Path) -> int:
+    info = configparser.ConfigParser()
+    try:
+        info.read(seq_dir / "seqinfo.ini")
+        return max(0, info.getint("Sequence", "seqLength", fallback=0))
+    except (configparser.Error, ValueError):
+        return 0
 
 
 def run_pipeline(config_path: Path, experimental_mode=False) -> None:
@@ -48,6 +60,7 @@ def run_pipeline(config_path: Path, experimental_mode=False) -> None:
     logger.info(f"[{current_mode}] warmup_frames=%s", config.warmup_frames)
     logger.info(f"[{current_mode}] visualization=%s", "enabled" if vis_enabled else "disabled")
 
+    logger.info("[%s] Loading detector weights", current_mode)
     model = load_yolo_model(config.model)
     track_dir = outdir / "tracks"
     track_dir.mkdir(parents=True, exist_ok=True)
@@ -71,16 +84,38 @@ def run_pipeline(config_path: Path, experimental_mode=False) -> None:
     accumulators = {}
     hota_pairs = {}
     timing_rows = []
+    frame_counts = {sequence: _sequence_frame_count(data_root / sequence) for sequence in sequences}
+    total_frames = sum(frame_counts.values()) if all(frame_counts.values()) else 0
+    num_clips = len(sequences)
+    completed_frames = 0
+    started = time.monotonic()
 
     with gmc_context:
-        for sequence in sequences:
+        for index, sequence in enumerate(sequences, 1):
             seq_dir = resolve_sequence_dir(data_root, sequence)
             pred_path = track_dir / f"{sequence}.txt"
             gt_path = seq_dir / "gt" / "gt.txt"
 
-            logger.info("[sequence] %s: tracking", sequence)
+            logger.info("[%s] clip %d/%d %s: tracking", config.gmc, index, num_clips, sequence)
 
-            run_info = run_botsort_sequence_baseline(model, seq_dir, pred_path, config)
+            def report_progress(clip_frames: int) -> None:
+                processed = completed_frames + clip_frames
+                elapsed = time.monotonic() - started
+                if total_frames:
+                    eta = timedelta(seconds=round(elapsed * max(0, total_frames - processed) / processed))
+                    logger.info(
+                        "[%s] clip %d/%d %s | %d/%d frames (%.1f%%) | tracking ETA %s",
+                        config.gmc, index, num_clips, sequence, processed,
+                        total_frames, 100 * processed / total_frames, eta,
+                    )
+                else:
+                    logger.info("[%s] clip %d/%d %s | %d frames", config.gmc, index, num_clips, sequence, processed)
+
+            run_info = run_botsort_sequence_baseline(model, seq_dir, pred_path, config, on_progress=report_progress)
+            clip_frames = int(run_info["timing"]["frames"])
+            if clip_frames:
+                report_progress(clip_frames)
+            completed_frames += clip_frames
             
             logger.info("[sequence] %s: wrote %s (%s rows)", sequence, pred_path, run_info["rows"])
             logger.info("[sequence] %s: evaluating", sequence)
@@ -105,6 +140,7 @@ def run_pipeline(config_path: Path, experimental_mode=False) -> None:
                 logger.info("[sequence] %s: rendering video -> %s", sequence, vis_path)
                 render_sequence_video(seq_dir, pred_path, vis_path, fps=vis_fps, max_frames=vis_max_frames)
 
+    logger.info("[%s] All %d clips tracked. Aggregating metrics on CPU", config.gmc, num_clips)
     hota_scores = compute_hota_scores(hota_pairs)
     metrics_summary = summarize_metrics(accumulators, hota_scores=hota_scores)
     

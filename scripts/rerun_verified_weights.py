@@ -110,7 +110,8 @@ def run() -> None:
             raise ValueError(f"CUDA device {args.device} is unavailable")
 
     args.out.mkdir(parents=True)
-    for method, config in configs.items():
+    for index, (method, config) in enumerate(configs.items(), 1):
+        print(f"[Benchmark {index}/{len(configs)}] {method}: tracking {len(sequences)} clips", flush=True)
         run_dir = Path(config["outdir"])
         run_dir.mkdir()
         config_path = run_dir / "run_config.yaml"
@@ -123,6 +124,7 @@ def run() -> None:
         ]
         for sequence in sequences:
             evaluate.extend(("--sequence", sequence))
+        print(f"[Benchmark {index}/{len(configs)}] {method}: running TrackEval", flush=True)
         subprocess.run(evaluate, check=True)
 
 

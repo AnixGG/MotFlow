@@ -6,6 +6,8 @@ import argparse
 import csv
 import hashlib
 import sys
+import time
+from datetime import timedelta
 from pathlib import Path
 
 import numpy as np
@@ -95,10 +97,19 @@ def evaluate(args: argparse.Namespace) -> None:
         trackeval.metrics.Identity({"PRINT_CONFIG": False}),
     )
     sequence_scores = []
-    for sequence in sequences:
+    total_frames = sum(dataset.seq_lengths.values())
+    processed_frames = 0
+    started = time.monotonic()
+    print(f"[TrackEval] CPU evaluation of {len(sequences)} clips and {total_frames} frames", flush=True)
+    for index, sequence in enumerate(sequences, 1):
         raw = dataset.get_raw_seq_data(run, sequence)
         data = dataset.get_preprocessed_seq_data(raw, "pedestrian")
         sequence_scores.append([metric.eval_sequence(data) for metric in metrics])
+        processed_frames += dataset.seq_lengths[sequence]
+        if index == 1 or index % 5 == 0 or index == len(sequences):
+            elapsed = time.monotonic() - started
+            eta = timedelta(seconds=round(elapsed * (total_frames - processed_frames) / max(1, processed_frames)))
+            print(f"[TrackEval] {index}/{len(sequences)} clips | {processed_frames}/{total_frames} frames | ETA {eta}", flush=True)
 
     overall = [
         metric.combine_sequences({seq: values[index] for seq, values in zip(sequences, sequence_scores)})
@@ -124,7 +135,7 @@ def evaluate(args: argparse.Namespace) -> None:
             for key in ("HOTA_TP", "HOTA_FP", "HOTA_FN", "AssA")
         },
     )
-    print(f"{len(sequences)} clips, {sum(dataset.seq_lengths.values())} frames, HOTA {rows[-1]['HOTA']}")
+    print(f"{len(sequences)} clips, {total_frames} frames, HOTA {rows[-1]['HOTA']}")
     print(f"TrackEval: {trackeval.__file__}")
     print(args.out)
 
