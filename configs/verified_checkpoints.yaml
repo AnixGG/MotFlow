@@ -1,0 +1,15 @@
+yolo11n_best:
+  path: archive_res/MOT_weights/yolo11n_sportsmot_best.pt
+  sha256: 2be87c64d5510d46b4a4c5d2c0fba7281328148c0cd08f8ba622982b520753bb
+yolo11n_last:
+  path: archive_res/MOT_weights-2/yolo11n_sportsmot_best.pt
+  sha256: 3397277ef2927e9af314870ffe315a69070f6e37e1c0229bcea6b4fac43a4155
+yolo11n_10epoch:
+  path: models/detector/finetuned/best.pt
+  sha256: 2ee5275d862da48bc88f9a1fdc6d83dfb5efd94aaad0be8b3c272c06f4a47320
+yolo11s_best:
+  path: archive_res/MOT_weights-2/yolo11s_sportsmot_best.pt
+  sha256: 40d11d9091e8a0a3d625885c8d5bcb889101e59b8ae795db9dc5405fec8cae2f
+yolo11m_best:
+  path: archive_res/MOT_weights-2/yolo11m_sportsmot_best.pt
+  sha256: 9c174abfc312e007ff701938529458adabade320b509c3f4e1f795b95ea70359
