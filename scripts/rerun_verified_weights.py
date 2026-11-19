@@ -45,7 +45,11 @@ def validate_sequence(directory: Path) -> None:
     expected = info["Sequence"].getint("seqLength")
     extension = info["Sequence"].get("imExt", ".jpg")
     image_directory = directory / "img1"
-    images = sorted(path.name for path in image_directory.glob(f"*{extension}") if path.is_file())
+    # The Ultralytics directory loader uses glob.glob, which skips hidden files.
+    images = sorted(
+        path.name for path in image_directory.glob(f"*{extension}")
+        if path.is_file() and not path.name.startswith(".")
+    )
     expected_images = [f"{frame:06d}{extension}" for frame in range(1, expected + 1)]
     if expected < 1 or images != expected_images:
         raise ValueError(f"{directory.name}: need all {expected} SportsMOT frames in {image_directory}, found {len(images)}")
