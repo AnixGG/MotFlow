@@ -12,13 +12,18 @@
 Запустите одну ячейку.
 
 ```bash
-%%bash
-git clone --branch workspace --single-branch https://github.com/AnixGG/MotFlow.git
+%%bash --no-raise-error
+set -euo pipefail
+cd /content
+if [[ ! -d MotFlow/.git ]]; then
+  git clone --branch workspace --single-branch https://github.com/AnixGG/MotFlow.git
+fi
 cd MotFlow
+git pull --ff-only origin workspace
 bash run.sh
 ```
 
-Если репозиторий уже клонирован, выполните `git pull --ff-only` в его каталоге и затем `bash run.sh`.
+Используйте URL в этой ячейке как обычный текст. При сбое Colab покажет вывод команды. Строки ошибки перед завершением ячейки укажут, какой файл или зависимость не удалось загрузить. Скрипт устанавливает совместимые версии NumPy и pandas в среде Colab с Python 3.13.
 
 Скрипт скачивает `last.pt`, сверяет хеши обоих чекпойнтов и трека, воспроизводит `gmc=none` для обоих весов на одном клипе с теми же настройками и сравнивает новые боксы и confidence со старым треком. При первом запуске Colab скачает SportsMOT val с кадрами, **6,59 ГБ**, и установит PyTorch с CUDA 12.8 в отдельное окружение. Следующие вызовы в той же сессии используют кеш. [Манифест чекпойнтов](../configs/verified_checkpoints.yaml)
 
