@@ -4,11 +4,17 @@ set -euo pipefail
 if [[ ${1:-} == --help ]]; then
   cat <<'HELP'
 Run the SportsMOT benchmark on a Colab GPU.
-Default: YOLO11m best, sparseOptFlow 8x and RAFT-large 128, all val clips.
+Default: provenance check for archived YOLO11n, best vs last on the same clip.
+Upload these two files first:
+  /content/yolo11n_sportsmot_best.pt
+  /content/v_00HRwkvvjtQ_c001.txt
+
+Run `bash run.sh benchmark` for the full YOLO11m comparison instead.
 
 Optional environment variables:
   MOT_CHECKPOINT     yolo11m_best, yolo11s_best, yolo11n_best, yolo11n_last, yolo11n_10epoch
   MOT_WEIGHTS        Path to a local checkpoint matching the expected SHA-256
+  MOT_ARCHIVE_TRACK  Path to the archived YOLO11n none track (provenance mode)
   MOT_VAL            Path to an already extracted SportsMOT val directory
   MOT_SEQUENCE       Run a single named clip
   MOT_METHOD         Run a single method (none, sparse4, sparse8, raft_large128, sift2)
@@ -17,8 +23,9 @@ Optional environment variables:
 HELP
   exit 0
 fi
-if [[ $# -ne 0 ]]; then
-  echo 'Usage: bash run.sh [--help]' >&2
+task=${1:-provenance}
+if [[ $# -gt 1 || "$task" != provenance && "$task" != benchmark ]]; then
+  echo 'Usage: bash run.sh [provenance|benchmark|--help]' >&2
   exit 2
 fi
 
@@ -30,22 +37,24 @@ results=${MOT_RESULTS_DIR:-/content/motflow-results}
 kit_commit=b06cfb4aacb0bb16c5778ac4ddb0d70ec6835444
 val_commit=1b0b418ea611a8e934f1e773313e719e4fa1265e
 val_sha256=35f1c585297426a2ec104f645c6bf8684e7e856c536775b167fe3f2ffd388ac3
+provenance_clip=v_00HRwkvvjtQ_c001
+provenance_sha256=d51866f1cfb601cc3ae3a86f4300e20ceab451bf77b346a959aa67fee09b5329
 
 fail() {
   echo "$*" >&2
   exit 1
 }
 
-case "$checkpoint" in
-  yolo11m_best) weight_id=1mHuZBesRudoCe8dBUs9fcs2tKNbAhJBc ;;
-  yolo11s_best) weight_id=1Kjo-ei1KV7nVa_jmnVzB8YWVu9tp0BqW ;;
-  yolo11n_last) weight_id=1RbC3D9emgMee1VnjczDspzn8spKwXOp9 ;;
-  yolo11n_best|yolo11n_10epoch)
-    weight_id=
-    [[ -n ${MOT_WEIGHTS:-} ]] || fail "$checkpoint requires MOT_WEIGHTS pointing to the verified .pt file."
-    ;;
-  *) fail "Unknown MOT_CHECKPOINT: $checkpoint" ;;
-esac
+if [[ "$task" == provenance ]]; then
+  best_weights=${MOT_WEIGHTS:-/content/yolo11n_sportsmot_best.pt}
+  archive_track=${MOT_ARCHIVE_TRACK:-"/content/$provenance_clip.txt"}
+  [[ -f "$best_weights" ]] || fail "Upload YOLO11n best from MOT_weights/ to $best_weights."
+  [[ -f "$archive_track" ]] || fail "Upload the archived YOLO11n none track to $archive_track."
+  [[ $(sha256sum < "$archive_track") == "$provenance_sha256 "* ]] || fail "Wrong archived track file: $archive_track. Use the experiments805nano YOLO11n none track."
+  job_name=yolo11n-provenance
+else
+  job_name=$checkpoint
+fi
 
 command -v nvidia-smi >/dev/null || fail 'Enable a GPU runtime in Colab first.'
 [[ -n $(nvidia-smi --query-gpu=name --format=csv,noheader) ]] || fail 'No NVIDIA GPU is available.'
@@ -55,7 +64,7 @@ results=$(cd -- "$results" && pwd)
 kit_root="$cache/sportsmot-kit-$kit_commit"
 kit="$kit_root/codes/evaluation/TrackEval"
 python="$cache/venv/bin/python"
-job=$(mktemp -d "$results/$checkpoint-$(date -u +%Y%m%dT%H%M%SZ)-XXXXXX")
+job=$(mktemp -d "$results/$job_name-$(date -u +%Y%m%dT%H%M%SZ)-XXXXXX")
 
 fetch() {
   local url=$1 target=$2
@@ -111,20 +120,21 @@ prepare_val() {
   [[ -d "$MOT_VAL" ]] || fail "SportsMOT val directory not found: $MOT_VAL"
 }
 
-run_workspace() {
-  git rev-parse HEAD > "$job/git-commit.txt"
-  printf '%s\n' "$kit_commit" > "$job/sportsmot-trackeval-commit.txt"
-  nvidia-smi > "$job/nvidia-smi.txt"
-  setup_python
-  prepare_kit
-  export PYTHONPATH="$kit"
-  export TORCH_HOME="$cache/torch"
-  export YOLO_CONFIG_DIR="$cache/ultralytics-config"
-  mkdir -p -- "$TORCH_HOME" "$YOLO_CONFIG_DIR"
+fetch_weights() {
+  local weight_id
+  case "$1" in
+    yolo11m_best) weight_id=1mHuZBesRudoCe8dBUs9fcs2tKNbAhJBc ;;
+    yolo11s_best) weight_id=1Kjo-ei1KV7nVa_jmnVzB8YWVu9tp0BqW ;;
+    yolo11n_last) weight_id=1RbC3D9emgMee1VnjczDspzn8spKwXOp9 ;;
+    *) fail "$1 requires MOT_WEIGHTS pointing to the verified .pt file." ;;
+  esac
+  fetch "https://drive.usercontent.google.com/download?id=$weight_id&export=download&confirm=t" "$2"
+}
 
+run_benchmark() {
   local weights=${MOT_WEIGHTS:-"$cache/$checkpoint.pt"}
   if [[ -z ${MOT_WEIGHTS:-} ]]; then
-    fetch "https://drive.usercontent.google.com/download?id=$weight_id&export=download&confirm=t" "$weights"
+    fetch_weights "$checkpoint" "$weights"
   fi
 
   local args=(
@@ -142,6 +152,46 @@ run_workspace() {
       --baseline "$job/benchmark/sparse8/trackeval" \
       --candidate "$job/benchmark/raft_large128/trackeval" \
       --out "$job/comparison"
+  fi
+}
+
+run_provenance() {
+  local last_weights="$cache/yolo11n_last.pt"
+  local common=(--trackeval-kit "$kit" --sequence "$provenance_clip" --method none)
+  local best=(--checkpoint yolo11n_best --weights "$best_weights" --out "$job/best")
+  local last=(--checkpoint yolo11n_last --weights "$last_weights" --out "$job/last")
+  fetch_weights yolo11n_last "$last_weights"
+  "$python" scripts/rerun_verified_weights.py "${common[@]}" "${best[@]}" --data "${MOT_VAL:-$cache}" --dry-run > "$job/best-plan.yaml"
+  "$python" scripts/rerun_verified_weights.py "${common[@]}" "${last[@]}" --data "${MOT_VAL:-$cache}" --dry-run > "$job/last-plan.yaml"
+  prepare_val
+  "$python" scripts/rerun_verified_weights.py "${common[@]}" "${best[@]}" --data "$MOT_VAL"
+  "$python" scripts/rerun_verified_weights.py "${common[@]}" "${last[@]}" --data "$MOT_VAL"
+
+  mkdir -p -- "$job/archive/tracks"
+  cp -- "$archive_track" "$job/archive/tracks/$provenance_clip.txt"
+  "$python" scripts/evaluate_tracks.py --gt "$MOT_VAL" --tracks "$job/archive/tracks" \
+    --out "$job/archive/trackeval" --trackeval-kit "$kit" --sequence "$provenance_clip"
+  "$python" scripts/compare_prediction_fingerprints.py --reference "$archive_track" \
+    --candidate "$job/best/none/tracks/$provenance_clip.txt" \
+    --candidate "$job/last/none/tracks/$provenance_clip.txt" \
+    --verdict "$job/verdict.txt" > "$job/fingerprints.csv"
+  cat "$job/verdict.txt"
+}
+
+run_workspace() {
+  git rev-parse HEAD > "$job/git-commit.txt"
+  printf '%s\n' "$kit_commit" > "$job/sportsmot-trackeval-commit.txt"
+  nvidia-smi > "$job/nvidia-smi.txt"
+  setup_python
+  prepare_kit
+  export PYTHONPATH="$kit"
+  export TORCH_HOME="$cache/torch"
+  export YOLO_CONFIG_DIR="$cache/ultralytics-config"
+  mkdir -p -- "$TORCH_HOME" "$YOLO_CONFIG_DIR"
+  if [[ "$task" == provenance ]]; then
+    run_provenance
+  else
+    run_benchmark
   fi
 }
 

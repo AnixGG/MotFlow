@@ -1,6 +1,6 @@
 # RAFT-GMC для multi-object tracking на спортивных видео
 
-Для запуска на GPU Google Colab используется `bash run.sh`. Он подготавливает окружение, загружает проверенный чекпойнт и SportsMOT val, запускает сравнение и формирует архив результатов. [Запуск в Colab](docs/colab.md)
+На GPU Google Colab команда `bash run.sh` сверяет старый прогон YOLO11n с двумя чекпойнтами, а `bash run.sh benchmark` запускает полное сравнение методов. [Запуск в Colab](docs/colab.md)
 
 Проект посвящен исследованию multi-object tracking на спортивных видео SportsMOT. В основе пайплайна используются детектор YOLO11, трекер BoT-SORT и разные методы глобальной компенсации движения камеры (GMC).
 

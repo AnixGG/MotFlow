@@ -26,7 +26,7 @@ def read_tracks(path: Path) -> dict[int, np.ndarray]:
 def compare(reference: dict, candidate: dict) -> dict:
     n_reference = sum(map(len, reference.values()))
     n_candidate = sum(map(len, candidate.values()))
-    matched = near_exact = 0
+    matched = near_exact = confidence_matches = 0
     confidence_errors = []
     for frame in reference.keys() & candidate.keys():
         old = reference[frame]
@@ -43,8 +43,10 @@ def compare(reference: dict, candidate: dict) -> dict:
         i, j = linear_sum_assignment(iou - 0.001 * errors, maximize=True)
         assigned_iou, assigned_error = iou[i, j], errors[i, j]
         aligned = assigned_iou >= 0.5
+        close_confidence = assigned_error <= 0.001
         matched += int(aligned.sum())
-        near_exact += int(((assigned_iou >= 0.99) & (assigned_error <= 0.001)).sum())
+        confidence_matches += int((aligned & close_confidence).sum())
+        near_exact += int(((assigned_iou >= 0.99) & close_confidence).sum())
         confidence_errors.extend(assigned_error[aligned])
     return {
         "reference_boxes": n_reference,
@@ -52,7 +54,9 @@ def compare(reference: dict, candidate: dict) -> dict:
         "matched_iou50": matched,
         "near_exact_boxes": near_exact,
         "near_exact_f1": f"{2 * near_exact / (n_candidate + n_reference):.6f}",
+        "confidence_match_f1": f"{2 * confidence_matches / (n_candidate + n_reference):.6f}",
         "matched_confidence_mae": f"{np.mean(confidence_errors):.6f}" if matched else "",
+        "matched_confidence_max_error": f"{max(confidence_errors):.8f}" if matched else "",
     }
 
 
@@ -60,7 +64,10 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--reference", type=Path, required=True)
     parser.add_argument("--candidate", type=Path, action="append", required=True, help="Repeat for each run of the same clip")
+    parser.add_argument("--verdict", type=Path, help="Compare two candidates, supplied in best then last order, and save a verdict")
     args = parser.parse_args()
+    if args.verdict and len(args.candidate) != 2:
+        parser.error("--verdict requires two --candidate arguments in best, last order")
     reference = read_tracks(args.reference)
     rows = [
         {"candidate": str(path), **compare(reference, read_tracks(path))}
@@ -69,6 +76,16 @@ def main() -> None:
     writer = csv.DictWriter(sys.stdout, fieldnames=rows[0])
     writer.writeheader()
     writer.writerows(rows)
+    if args.verdict:
+        best, last = (float(row["confidence_match_f1"]) for row in rows)
+        confidence = max(best, last)
+        separation = abs(best - last)
+        result = "inconclusive"
+        if len(reference) >= 100 and confidence >= 0.90 and separation >= 0.10:
+            result = "best" if best > last else "last"
+        with args.verdict.open("x", encoding="utf-8") as handle:
+            handle.write(f"result={result}\nbest_confidence_match_f1={best:.6f}\nlast_confidence_match_f1={last:.6f}\n")
+            handle.write("rule=IoU at least 0.5 and confidence error at most 0.001, 100+ archive frames, F1 at least 0.90, F1 lead at least 0.10\n")
 
 
 if __name__ == "__main__":
